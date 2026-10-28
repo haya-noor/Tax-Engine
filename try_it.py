@@ -25,7 +25,10 @@ def main():
         engine = TaxEngine(args.rates_dir, collect_in=collect_in)
     except FileNotFoundError as e:
         sys.exit(f"{e}\nUnzip the rate tables into that folder, or pass --rates-dir.")
-    print(engine.calculate(args.zip_code, args.amount, state=args.state))
+    try:
+        print(engine.calculate(args.zip_code, args.amount, state=args.state))
+    except (LookupError, ValueError) as e:
+        sys.exit(str(e))
 
 
 if __name__ == "__main__":
