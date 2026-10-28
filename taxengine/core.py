@@ -4,18 +4,25 @@ Given a US ZIP code and an amount, return the state, county, city and
 special-district rates, the combined rate, and the tax.
 
 Rates come from the client's Avalara ZIP5 rate tables (one CSV per state).
-No platform code lives here: Stripe, Shopify, etc. come later and call this.
+No platform code lives here. Checkout or billing systems connect through
+adapters outside this package that call TaxEngine.calculate().
 """
 
 import csv
+import os
 from dataclasses import dataclass
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 
 CENT = Decimal("0.01")
 
-# Default data folder: tax-engine/data/avalara-2026-10
-DEFAULT_RATES_DIR = Path(__file__).resolve().parent.parent / "data" / "avalara-2026-10"
+# Default data folder: <repo>/data/avalara-2026-10, or set TAXENGINE_RATES_DIR.
+DEFAULT_RATES_DIR = Path(
+    os.environ.get(
+        "TAXENGINE_RATES_DIR",
+        Path(__file__).resolve().parent.parent / "data" / "avalara-2026-10",
+    )
+)
 
 
 class UnknownZipError(LookupError):
@@ -54,6 +61,7 @@ class TaxResult:
     combined_rate: Decimal
     total_tax: Decimal
     layers: list
+    rate_version: str = ""    # the rate table folder used, e.g. "avalara-2026-10"
 
     def __str__(self):
         lines = [
@@ -85,13 +93,17 @@ def normalize_zip(zip_code):
     return text.zfill(5)
 
 
-def load_rates(rates_dir):
-    """Read every TAXRATES_ZIP5_*.csv into {zip: [RateRow, ...]}.
+def load_rates(rates_dir, states=None):
+    """Read TAXRATES_ZIP5_*.csv files into {zip: [RateRow, ...]}.
 
     A list, because about 80 ZIPs cross a state line (e.g. 88240 is in NM and TX).
+    With states (e.g. {"IL"}), only those states' files are read.
     """
     rates = {}
     files = sorted(Path(rates_dir).glob("TAXRATES_ZIP5_*.csv"))
+    if states:
+        # File names look like TAXRATES_ZIP5_CA202610.csv: the state follows "ZIP5_".
+        files = [f for f in files if f.name[len("TAXRATES_ZIP5_"):][:2] in states]
     if not files:
         raise FileNotFoundError(f"No TAXRATES_ZIP5_*.csv files in {rates_dir}")
     for path in files:
@@ -112,8 +124,19 @@ def load_rates(rates_dir):
 
 
 class TaxEngine:
-    def __init__(self, rates_dir=DEFAULT_RATES_DIR):
-        self.rates = load_rates(rates_dir)
+    """Calculates tax for the states we collect in.
+
+    collect_in: the states the seller is registered in, e.g. {"IL"}. Addresses in
+    any other state get 0 tax. None means every state in the rate tables.
+    """
+
+    def __init__(self, rates_dir=DEFAULT_RATES_DIR, collect_in=None):
+        self.collect_in = {s.upper() for s in collect_in} if collect_in else None
+        self.rates = load_rates(rates_dir, self.collect_in)
+        self.rate_version = Path(rates_dir).name
+
+    def collects_in(self, state):
+        return self.collect_in is None or state.upper() in self.collect_in
 
     def find_rate(self, zip_code, state=None):
         zip_code = normalize_zip(zip_code)
@@ -131,6 +154,8 @@ class TaxEngine:
 
     def calculate(self, zip_code, amount, state=None):
         amount = money(amount)
+        if state and not self.collects_in(state):
+            return untaxed(normalize_zip(zip_code), state.upper(), amount, self.rate_version)
         row = self.find_rate(zip_code, state)
         layers = [
             LayerTax("state", row.state_rate, money(amount * row.state_rate)),
@@ -148,4 +173,19 @@ class TaxEngine:
             combined_rate=row.combined,
             total_tax=money(amount * row.combined),
             layers=layers,
+            rate_version=self.rate_version,
         )
+
+
+def untaxed(zip_code, state, amount, rate_version=""):
+    """A zero-tax result for a state we don't collect in."""
+    return TaxResult(
+        zip_code=zip_code,
+        state=state,
+        region="not collected in this state",
+        amount=amount,
+        combined_rate=Decimal("0"),
+        total_tax=money(0),
+        layers=[],
+        rate_version=rate_version,
+    )

@@ -1,0 +1,2 @@
+State,ZipCode,TaxRegionName,StateRate,EstimatedCombinedRate,EstimatedCountyRate,EstimatedCityRate,EstimatedSpecialRate,RiskLevel
+TX,88240,GAINES,0.062500,0.062500,0.000000,0.000000,0.000000,0
