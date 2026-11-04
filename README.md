@@ -46,6 +46,31 @@ collect in.
 layer, and the rate table version. The total always uses the combined rate; the
 layers are the breakdown.
 
+## Adapters
+
+Adapters live in `adapters/` and only translate; the tax logic stays in
+`taxengine/`.
+
+### Stripe invoices (test mode)
+
+`adapters/stripe_invoices.py` adds the engine's tax to a draft Stripe invoice,
+one tax line per layer, using Stripe's
+[manual tax amounts](https://docs.stripe.com/invoicing/taxes/manual-tax-amounts).
+It taxes the shipping address, or the billing address if there is none, on
+each line's amount after discounts.
+
+    pip install -r requirements-stripe.txt
+    $env:STRIPE_SECRET_KEY = "sk_test_..."     # PowerShell; Stripe Dashboard > Developers > API keys, test mode
+    python stripe_demo.py                                # Chicago, two sample items
+    python stripe_demo.py --zip 98101 --state WA --city Seattle --item "Hoodie=59.99"
+
+The demo creates a customer, a draft invoice with the items, adds our tax,
+finalizes it, and prints links to the invoice. Only test keys are accepted.
+
+`stripe_webhook.py` does the same automatically for every new draft invoice
+(for example subscription renewals), the way a tax app does: run it next to
+`stripe listen --forward-to localhost:4242/webhook`. See the file for steps.
+
 ## Rate data
 
 Rates come from monthly ZIP-code rate tables, one CSV per state, in
@@ -72,6 +97,9 @@ No extra libraries are needed (Python 3.10+).
 ## Project layout
 
     taxengine/        the engine (no platform code)
+    adapters/         connections to other systems (Stripe so far)
     data/             rate tables
     tests/            tests, with small sample rate files in tests/fixtures/
     try_it.py         try it from the command line
+    stripe_demo.py    make a Stripe test invoice with our tax
+    stripe_webhook.py add our tax to new Stripe invoices automatically
