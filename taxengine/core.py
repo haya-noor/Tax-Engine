@@ -63,6 +63,23 @@ class TaxResult:
     layers: list
     rate_version: str = ""    # the rate table folder used, e.g. "avalara-2026-10"
 
+    def balanced_layers(self):
+        """The layers with a rate, adjusted so their taxes add up to total_tax.
+
+        Each layer is rounded on its own, so they can miss the total by a cent.
+        Systems that sum the layers (e.g. an invoice showing one tax line per
+        layer) need them to match, so the difference goes on the largest layer.
+        """
+        layers = [l for l in self.layers if l.rate]
+        if not layers:
+            return []
+        diff = self.total_tax - sum(l.tax for l in layers)
+        if diff:
+            i = max(range(len(layers)), key=lambda i: layers[i].rate)
+            big = layers[i]
+            layers[i] = LayerTax(big.layer, big.rate, big.tax + diff)
+        return layers
+
     def __str__(self):
         lines = [
             f"ZIP {self.zip_code}  {self.region}, {self.state}",
