@@ -39,7 +39,7 @@ def main():
     parser.add_argument("--keep-draft", action="store_true", help="don't finalize, so you can inspect the draft")
     args = parser.parse_args()
 
-    key = os.environ.get("STRIPE_SECRET_KEY", "")
+    key = os.environ.get("STRIPE_SECRET_KEY", "").strip()
     if not key.startswith(("sk_test_", "rk_test_")):
         sys.exit("Set STRIPE_SECRET_KEY to a Stripe TEST key (sk_test_...). Live keys are refused.")
     client = stripe.StripeClient(key)
@@ -48,6 +48,7 @@ def main():
 
     customer = client.v1.customers.create({
         "name": "Tax Engine Test Customer",
+        "email": "tax-engine-test@example.com",   # Stripe needs one to send an invoice
         "address": {"line1": "100 Test St", "city": args.city, "state": args.state,
                     "postal_code": args.zip, "country": "US"},
     })

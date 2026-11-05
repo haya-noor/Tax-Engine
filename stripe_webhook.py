@@ -58,8 +58,8 @@ def make_handler(client, engine, webhook_secret):
 
 
 def main():
-    key = os.environ.get("STRIPE_SECRET_KEY", "")
-    secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+    key = os.environ.get("STRIPE_SECRET_KEY", "").strip()
+    secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "").strip()
     if not key.startswith(("sk_test_", "rk_test_")) or not secret:
         sys.exit("Set STRIPE_SECRET_KEY (a test key, sk_test_...) and STRIPE_WEBHOOK_SECRET (whsec_...).")
     collect_in = os.environ.get("TAXENGINE_COLLECT_IN")
