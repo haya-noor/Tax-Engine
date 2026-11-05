@@ -76,7 +76,7 @@ def main():
     print(f"  Our tax:   {tax_cents / 100:>10.2f}")
     print(f"  Total:     {invoice.total / 100:>10.2f}")
     print(f"Dashboard: https://dashboard.stripe.com/test/invoices/{invoice.id}")
-    if invoice.get("hosted_invoice_url"):
+    if invoice.to_dict().get("hosted_invoice_url"):
         print(f"Customer view: {invoice.hosted_invoice_url}")
 
 
