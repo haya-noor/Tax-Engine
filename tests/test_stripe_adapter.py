@@ -10,6 +10,18 @@ from taxengine import TaxEngine
 FIXTURES = Path(__file__).parent / "fixtures" / "rates"
 
 
+class StripeLike(dict):
+    """Behaves like a stripe.StripeObject: item access and to_dict(), but no .get()."""
+
+    def __getattribute__(self, name):
+        if name == "get":
+            raise AttributeError("'get' is a dict method, but this is not a dict")
+        return super().__getattribute__(name)
+
+    def to_dict(self):
+        return dict(self)
+
+
 class FakePage(list):
     def auto_paging_iter(self):
         return iter(self)
@@ -25,10 +37,10 @@ class FakeStripe:
         self.line_items = self
 
     def retrieve(self, invoice_id):
-        return self.invoice
+        return StripeLike(self.invoice)
 
     def list(self, invoice_id, params):
-        return FakePage(self.lines)
+        return FakePage(StripeLike(line) for line in self.lines)
 
     def update(self, invoice_id, line_id, params):
         self.updates[line_id] = params["tax_amounts"]
@@ -88,6 +100,21 @@ class StripeAdapterTest(unittest.TestCase):
             add_tax_to_invoice(FakeStripe(chicago_invoice(status="open"), []), self.engine, "in_1")
         with self.assertRaises(NoTaxAddressError):
             add_tax_to_invoice(FakeStripe(chicago_invoice(customer_address=None), []), self.engine, "in_1")
+
+
+class RealStripeObjectTest(unittest.TestCase):
+    """Runs the adapter on real stripe.StripeObject values when the stripe package is installed."""
+
+    def test_adapter_reads_real_stripe_objects(self):
+        try:
+            import stripe
+        except ImportError:
+            self.skipTest("stripe package not installed")
+        wrap = lambda d: stripe.StripeObject.construct_from(d, "sk_test_x")
+        fake = FakeStripe(chicago_invoice(), [{"id": "il_1", "amount": 5000, "discount_amounts": []}])
+        fake.retrieve = lambda invoice_id: wrap(chicago_invoice())
+        fake.list = lambda invoice_id, params: FakePage([wrap(fake.lines[0])])
+        self.assertEqual(add_tax_to_invoice(fake, TaxEngine(FIXTURES), "in_1"), 525)
 
 
 if __name__ == "__main__":

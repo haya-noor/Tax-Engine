@@ -40,13 +40,13 @@ def make_handler(client, engine, webhook_secret):
                 return self.reply(400, "bad signature")
 
             if event.type == "invoice.created":
-                invoice = event.data.object
-                if invoice.status == "draft" and not (invoice.get("automatic_tax") or {}).get("enabled"):
+                invoice = event.data.object.to_dict()
+                if invoice["status"] == "draft" and not (invoice.get("automatic_tax") or {}).get("enabled"):
                     try:
-                        cents = add_tax_to_invoice(client, engine, invoice.id)
-                        print(f"{invoice.id}: added tax {cents / 100:.2f}")
+                        cents = add_tax_to_invoice(client, engine, invoice["id"])
+                        print(f"{invoice['id']}: added tax {cents / 100:.2f}")
                     except (NoTaxAddressError, LookupError) as e:
-                        print(f"{invoice.id}: no tax added: {e}")
+                        print(f"{invoice['id']}: no tax added: {e}")
             self.reply(200, "ok")
 
         def reply(self, code, text):

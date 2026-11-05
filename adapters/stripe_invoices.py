@@ -20,6 +20,11 @@ class NoTaxAddressError(ValueError):
     """The invoice has no US address with a ZIP code and state to tax."""
 
 
+def plain(obj):
+    """Stripe's objects aren't dicts (no .get); work on a plain dict copy."""
+    return obj.to_dict() if hasattr(obj, "to_dict") else obj
+
+
 def to_cents(dollars):
     return int(money(dollars) * 100)
 
@@ -71,13 +76,14 @@ def add_tax_to_invoice(client, engine, invoice_id):
 
     client is a stripe.StripeClient; engine is a taxengine.TaxEngine.
     """
-    invoice = client.v1.invoices.retrieve(invoice_id)
+    invoice = plain(client.v1.invoices.retrieve(invoice_id))
     if invoice["status"] != "draft":
         raise ValueError(f"Invoice {invoice_id} is {invoice['status']}; tax can only be set on drafts")
     zip_code, state = invoice_address(invoice)
 
     total = 0
     for line in client.v1.invoices.line_items.list(invoice_id, {"limit": 100}).auto_paging_iter():
+        line = plain(line)
         cents = taxable_cents(line)
         if cents <= 0:
             continue    # credits and free lines carry no tax
