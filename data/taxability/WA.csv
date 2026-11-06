@@ -1,0 +1,14 @@
+category,taxable,description,source
+general,yes,"Physical goods with no exemption (the default category)",https://dor.wa.gov/taxes-rates/retail-sales-tax
+clothing,yes,"Clothing and shoes; Washington has no clothing exemption",https://dor.wa.gov/taxes-rates/retail-sales-tax/retail-sales-and-use-tax-exemptions
+groceries,no,"Food and food ingredients, including candy and gum (RCW 82.08.0293)",https://app.leg.wa.gov/RCW/default.aspx?cite=82.08.0293
+prepared_food,yes,"Food heated or mixed by the seller, or sold with utensils (excluded from the food exemption)",https://app.leg.wa.gov/RCW/default.aspx?cite=82.08.0293
+soft_drinks,yes,"Sweetened non-alcoholic drinks; not drinks with milk or over 50% juice (excluded from the food exemption)",https://app.leg.wa.gov/RCW/default.aspx?cite=82.08.0293
+bottled_water,yes,"Bottled water (excluded from the food exemption)",https://app.leg.wa.gov/RCW/default.aspx?cite=82.08.0293
+dietary_supplements,yes,"Vitamins and supplements sold without a prescription",https://dor.wa.gov/sites/default/files/2022-02/PharmacySalesChart.pdf
+prescription_drugs,no,"Drugs dispensed under a prescription (RCW 82.08.0281)",https://app.leg.wa.gov/RCW/default.aspx?cite=82.08.0281
+otc_drugs,yes,"Over-the-counter medicine sold without a prescription",https://dor.wa.gov/sites/default/files/2022-02/PharmacySalesChart.pdf
+newspapers,no,"Newspapers (RCW 82.08.0253)",https://app.leg.wa.gov/RCW/default.aspx?cite=82.08.0253
+digital_goods,yes,"Downloaded or streamed music, movies, books and similar",https://dor.wa.gov/forms-publications/publications-subject/tax-topics/digital-products-including-digital-goods
+software,yes,"Prewritten software, downloaded or used online (remote access software / SaaS)",https://dor.wa.gov/forms-publications/publications-subject/tax-topics/digital-products-including-digital-goods
+shipping,proportional,"Delivery charges are taxed in the same share as the goods delivered (by price)",https://dor.wa.gov/forms-publications/publications-subject/tax-topics/delivery-charges

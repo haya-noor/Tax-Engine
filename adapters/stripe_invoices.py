@@ -1,17 +1,20 @@
 """Stripe adapter: add the engine's sales tax to a draft Stripe invoice.
 
 For each line on the invoice, the engine works out the tax from the customer's
-address, and the tax is written to the line as Stripe "manual tax amounts",
-one per layer (state, county, city, special district). The invoice must still
-be a draft: Stripe doesn't allow tax changes after it is finalized.
+address and the line's product category, and writes it to the line as Stripe
+"manual tax amounts", one per layer (state, county, city, special district).
+The invoice must still be a draft: Stripe doesn't allow tax changes after it
+is finalized.
 
 Stripe's guide: https://docs.stripe.com/invoicing/taxes/manual-tax-amounts
 """
 
 from decimal import Decimal
 
-from taxengine import money
+from taxengine import CartLine, calculate_cart, money
+from taxengine.taxability import GENERAL, SHIPPING
 
+CATEGORY_KEY = "tax_category"
 STRIPE_LEVEL = {"state": "state", "county": "county", "city": "city", "special": "district"}
 LAYER_NAME = {"state": "State", "county": "County", "city": "City", "special": "Special district"}
 
@@ -71,25 +74,48 @@ def tax_amounts_for(result):
     return amounts
 
 
+def line_category(client, line):
+    """The product category from metadata, e.g. {"tax_category": "groceries"}.
+
+    Read from the line, or else from the invoice item it came from.
+    """
+    metadata = line.get("metadata") or {}
+    if CATEGORY_KEY not in metadata:
+        item_id = ((line.get("parent") or {}).get("invoice_item_details") or {}).get("invoice_item")
+        if item_id:
+            metadata = plain(client.v1.invoice_items.retrieve(item_id)).get("metadata") or {}
+    return metadata.get(CATEGORY_KEY) or GENERAL
+
+
 def add_tax_to_invoice(client, engine, invoice_id):
     """Calculate and set tax on every line of a draft invoice. Returns total tax in cents.
 
-    client is a stripe.StripeClient; engine is a taxengine.TaxEngine.
+    client is a stripe.StripeClient; engine is a taxengine.TaxEngine. Each line's
+    product category comes from its "tax_category" metadata (default "general");
+    lines with category "shipping" are delivery charges.
     """
     invoice = plain(client.v1.invoices.retrieve(invoice_id))
     if invoice["status"] != "draft":
         raise ValueError(f"Invoice {invoice_id} is {invoice['status']}; tax can only be set on drafts")
     zip_code, state = invoice_address(invoice)
 
+    lines = [plain(line) for line in client.v1.invoices.line_items.list(invoice_id, {"limit": 100}).auto_paging_iter()]
+    lines = [line for line in lines if taxable_cents(line) > 0]    # credits and free lines carry no tax
+    categories = {line["id"]: line_category(client, line) for line in lines}
+    goods = [CartLine(line["id"], to_dollars(taxable_cents(line)), category=categories[line["id"]])
+             for line in lines if categories[line["id"]] != SHIPPING]
+
+    taxes = {t.line_id: t for t in calculate_cart(engine, zip_code, state, goods).lines}
+    for line in lines:
+        if categories[line["id"]] == SHIPPING:
+            shipping = calculate_cart(engine, zip_code, state, goods, shipping=to_dollars(taxable_cents(line))).shipping
+            taxes[line["id"]] = shipping
+
     total = 0
-    for line in client.v1.invoices.line_items.list(invoice_id, {"limit": 100}).auto_paging_iter():
-        line = plain(line)
-        cents = taxable_cents(line)
-        if cents <= 0:
-            continue    # credits and free lines carry no tax
-        amounts = tax_amounts_for(engine.calculate(zip_code, to_dollars(cents), state=state))
+    for line_id, line_tax in taxes.items():
+        amounts = tax_amounts_for(line_tax.tax) if line_tax.taxable else []
         if not amounts:
-            continue    # a state we don't collect in
-        client.v1.invoices.line_items.update(invoice_id, line["id"], {"tax_amounts": amounts})
+            continue    # exempt, or a state we don't collect in
+        client.v1.invoices.line_items.update(invoice_id, line_id, {"tax_amounts": amounts})
         total += sum(a["amount"] for a in amounts)
     return total

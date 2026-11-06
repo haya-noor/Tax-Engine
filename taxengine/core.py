@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 
+from .taxability import DEFAULT_TAXABILITY_DIR, load_taxability
+
 CENT = Decimal("0.01")
 
 # Default data folder: <repo>/data/avalara-2026-10, or set TAXENGINE_RATES_DIR.
@@ -143,14 +145,16 @@ def load_rates(rates_dir, states=None):
 class TaxEngine:
     """Calculates tax for the states we collect in.
 
-    collect_in: the states the seller is registered in, e.g. {"IL"}. Addresses in
+    collect_in: the states the seller is registered in, e.g. {"WA"}. Addresses in
     any other state get 0 tax. None means every state in the rate tables.
+    taxability_dir: the per-state product category rules (see taxability.py).
     """
 
-    def __init__(self, rates_dir=DEFAULT_RATES_DIR, collect_in=None):
+    def __init__(self, rates_dir=DEFAULT_RATES_DIR, collect_in=None, taxability_dir=DEFAULT_TAXABILITY_DIR):
         self.collect_in = {s.upper() for s in collect_in} if collect_in else None
         self.rates = load_rates(rates_dir, self.collect_in)
         self.rate_version = Path(rates_dir).name
+        self.taxability = load_taxability(taxability_dir)
 
     def collects_in(self, state):
         return self.collect_in is None or state.upper() in self.collect_in
@@ -194,12 +198,12 @@ class TaxEngine:
         )
 
 
-def untaxed(zip_code, state, amount, rate_version=""):
-    """A zero-tax result for a state we don't collect in."""
+def untaxed(zip_code, state, amount, rate_version="", reason="not collected in this state"):
+    """A zero-tax result: a state we don't collect in, or an exempt product."""
     return TaxResult(
         zip_code=zip_code,
         state=state,
-        region="not collected in this state",
+        region=reason,
         amount=amount,
         combined_rate=Decimal("0"),
         total_tax=money(0),

@@ -1,17 +1,17 @@
 # Tax Engine
 
-A US sales tax engine. Give it a shipping address and an amount; it returns the
-sales tax, broken down by state, county, city and special district.
+A US sales tax engine. Give it a shipping address and a cart; it returns the
+sales tax for each line, broken down by state, county, city and special district.
 
 ## What it does
 
 - Looks up the tax rates for an address by ZIP code (state, county, city, special district).
 - Taxes only the states you collect in; every other state gets 0 tax.
-- Rounds money to the cent, half up, using exact decimals (never floats).
+- Taxes a whole cart: line items, quantities, discounts and shipping.
+- Applies each state's product rules by category (e.g. in Washington groceries
+  are exempt and clothing is taxed). Washington is the first state with rules.
+- Rounds money to the cent, half up, per line, using exact decimals (never floats).
 - Records which rate table version was used, so every result can be traced.
-
-Coming next: whole carts (line items, quantities, discounts, shipping) and
-product categories that are taxed differently.
 
 ## How it fits into other systems
 
@@ -46,6 +46,45 @@ collect in.
 layer, and the rate table version. The total always uses the combined rate; the
 layers are the breakdown.
 
+### A whole cart
+
+```python
+from taxengine import CartLine, TaxEngine, calculate_cart
+
+engine = TaxEngine(collect_in={"WA"})
+cart = calculate_cart(engine, "98101", "WA", [
+    CartLine("shirt", "25.00", quantity=2, discount="5.00", category="clothing"),
+    CartLine("bread", "5.00", category="groceries"),
+], shipping="8.00")
+
+cart.total_tax   # Decimal("5.51"): shirt 4.75 + bread 0 + shipping 0.76
+cart.lines       # per line: category, taxed or exempt, and its TaxResult
+```
+
+Each line is taxed and rounded on its own. Shipping follows the state's rule;
+in Washington it is taxed in the same share as the goods (here 90% of the
+goods by price are taxable, so 90% of the shipping is).
+
+## Product categories
+
+Which products are taxed is set per state in `data/taxability/<STATE>.csv`,
+one row per category, each with the official source it comes from. Products
+without a category are `general`. Washington's file covers:
+
+| Category | Taxed in WA? |
+|---|---|
+| `general`, `clothing` | yes |
+| `groceries` (incl. candy) | no |
+| `prepared_food`, `soft_drinks`, `bottled_water` | yes |
+| `dietary_supplements`, `otc_drugs` (no prescription) | yes |
+| `prescription_drugs`, `newspapers` | no |
+| `digital_goods`, `software` (incl. SaaS) | yes |
+| `shipping` | in proportion to taxed goods |
+
+An unknown category is an error, never a guess. States without a file tax
+`general` products and shipping only. See `data/taxability/README.md`. These
+rules should be checked by the client or a tax adviser before going live.
+
 ## Adapters
 
 Adapters live in `adapters/` and only translate; the tax logic stays in
@@ -57,12 +96,14 @@ Adapters live in `adapters/` and only translate; the tax logic stays in
 one tax line per layer, using Stripe's
 [manual tax amounts](https://docs.stripe.com/invoicing/taxes/manual-tax-amounts).
 It taxes the shipping address, or the billing address if there is none, on
-each line's amount after discounts.
+each line's amount after discounts. Each invoice item's product category comes
+from its metadata, e.g. `tax_category=groceries`; items with
+`tax_category=shipping` are delivery charges.
 
     pip install -r requirements-stripe.txt
     $env:STRIPE_SECRET_KEY = "sk_test_..."     # PowerShell; Stripe Dashboard > Developers > API keys, test mode
-    python stripe_demo.py                                # Chicago, two sample items
-    python stripe_demo.py --zip 98101 --state WA --city Seattle --item "Hoodie=59.99"
+    python stripe_demo.py                                # Seattle: T-shirt, bread, ebook, shipping
+    python stripe_demo.py --item "Hoodie=59.99:clothing" --item "Bread=4.50:groceries" --shipping 8.00
 
 The demo creates a customer, a draft invoice with the items, adds our tax,
 finalizes it, and prints links to the invoice. Only test keys are accepted.
@@ -90,15 +131,16 @@ Things to know about the data:
     python try_it.py 60601 100 --state IL
     python try_it.py 88240 59.99 --state TX
     python try_it.py 60601 100 --state IL --collect-in IL
+    python try_it.py 98101 4.50 --state WA --category groceries
     python -m unittest -v
 
 No extra libraries are needed (Python 3.10+).
 
 ## Project layout
 
-    taxengine/        the engine (no platform code)
+    taxengine/        the engine (no platform code): core.py, cart.py, taxability.py
     adapters/         connections to other systems (Stripe so far)
-    data/             rate tables
+    data/             rate tables, and product rules per state in data/taxability/
     tests/            tests, with small sample rate files in tests/fixtures/
     try_it.py         try it from the command line
     stripe_demo.py    make a Stripe test invoice with our tax
