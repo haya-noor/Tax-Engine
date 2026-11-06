@@ -10,8 +10,15 @@ from .core import (
     money,
     normalize_zip,
 )
+from .cart import CartLine, CartResult, calculate_cart
+from .taxability import UnknownCategoryError, load_taxability
 
 __all__ = [
+    "CartLine",
+    "CartResult",
+    "UnknownCategoryError",
+    "calculate_cart",
+    "load_taxability",
     "DEFAULT_RATES_DIR",
     "AmbiguousZipError",
     "TaxEngine",
