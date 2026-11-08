@@ -141,6 +141,7 @@ No extra libraries are needed (Python 3.10+).
     taxengine/        the engine (no platform code): core.py, cart.py, taxability.py
     adapters/         connections to other systems (Stripe so far)
     data/             rate tables, and product rules per state in data/taxability/
+                      official figures to check against in data/validation/
     tests/            tests, with small sample rate files in tests/fixtures/
     try_it.py         try it from the command line
     stripe_demo.py    make a Stripe test invoice with our tax
