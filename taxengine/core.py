@@ -45,11 +45,23 @@ class RateRow:
     county_rate: Decimal
     city_rate: Decimal
     special_rate: Decimal
+    # Where the rate came from: "zip5" for the ZIP5 tables, or an address source
+    # such as "dor-address". Address sources give one combined local rate.
+    source: str = "zip5"
+
+
+@dataclass(frozen=True)
+class Address:
+    """A street address. zip_code may be 5 or 9 digits ("98004" or "98004-1234")."""
+    line1: str
+    city: str
+    state: str
+    zip_code: str
 
 
 @dataclass(frozen=True)
 class LayerTax:
-    layer: str      # "state", "county", "city" or "special"
+    layer: str      # "state", "county", "city", "special", or "local" (county + city + district together)
     rate: Decimal
     tax: Decimal
 
@@ -64,6 +76,7 @@ class TaxResult:
     total_tax: Decimal
     layers: list
     rate_version: str = ""    # the rate table folder used, e.g. "avalara-2026-10"
+    source: str = "zip5"      # "zip5", or the address source used, e.g. "dor-address"
 
     def balanced_layers(self):
         """The layers with a rate, adjusted so their taxes add up to total_tax.
@@ -84,7 +97,8 @@ class TaxResult:
 
     def __str__(self):
         lines = [
-            f"ZIP {self.zip_code}  {self.region}, {self.state}",
+            f"ZIP {self.zip_code}  {self.region}, {self.state}"
+            + (f"  (rate by {self.source})" if self.source != "zip5" else ""),
             f"Amount:        {self.amount:>10}",
         ]
         for layer in self.layers:
@@ -148,9 +162,14 @@ class TaxEngine:
     collect_in: the states the seller is registered in, e.g. {"WA"}. Addresses in
     any other state get 0 tax. None means every state in the rate tables.
     taxability_dir: the per-state product category rules (see taxability.py).
+    resolvers: optional {state: resolver} for rates by street address. A resolver
+    has resolve(Address) -> RateRow or None; None falls back to the ZIP5 tables.
+    See wa_dor.WashingtonResolver.
     """
 
-    def __init__(self, rates_dir=DEFAULT_RATES_DIR, collect_in=None, taxability_dir=DEFAULT_TAXABILITY_DIR):
+    def __init__(self, rates_dir=DEFAULT_RATES_DIR, collect_in=None, taxability_dir=DEFAULT_TAXABILITY_DIR,
+                 resolvers=None):
+        self.resolvers = {k.upper(): v for k, v in (resolvers or {}).items()}
         self.collect_in = {s.upper() for s in collect_in} if collect_in else None
         self.rates = load_rates(rates_dir, self.collect_in)
         self.rate_version = Path(rates_dir).name
@@ -173,17 +192,37 @@ class TaxEngine:
             raise AmbiguousZipError(f"ZIP {zip_code} is in {states}; pass state=")
         return rows[0]
 
-    def calculate(self, zip_code, amount, state=None):
+    def rate_for(self, zip_code, state=None, address=None):
+        """The rate row for an address: by street address when a resolver for its
+        state gives one, otherwise by ZIP5."""
+        if address is not None:
+            resolver = self.resolvers.get((state or address.state or "").upper())
+            if resolver:
+                row = resolver.resolve(address)
+                if row is not None:
+                    return row
+        return self.find_rate(zip_code, state)
+
+    def calculate(self, zip_code, amount, state=None, address=None):
+        """Tax on amount. Pass address (an Address) to use the street address where
+        a resolver for that state is set up."""
         amount = money(amount)
         if state and not self.collects_in(state):
             return untaxed(normalize_zip(zip_code), state.upper(), amount, self.rate_version)
-        row = self.find_rate(zip_code, state)
-        layers = [
-            LayerTax("state", row.state_rate, money(amount * row.state_rate)),
-            LayerTax("county", row.county_rate, money(amount * row.county_rate)),
-            LayerTax("city", row.city_rate, money(amount * row.city_rate)),
-            LayerTax("special", row.special_rate, money(amount * row.special_rate)),
-        ]
+        row = self.rate_for(zip_code, state, address)
+        if row.source == "zip5":
+            layers = [
+                LayerTax("state", row.state_rate, money(amount * row.state_rate)),
+                LayerTax("county", row.county_rate, money(amount * row.county_rate)),
+                LayerTax("city", row.city_rate, money(amount * row.city_rate)),
+                LayerTax("special", row.special_rate, money(amount * row.special_rate)),
+            ]
+        else:
+            local = row.combined - row.state_rate
+            layers = [
+                LayerTax("state", row.state_rate, money(amount * row.state_rate)),
+                LayerTax("local", local, money(amount * local)),
+            ]
         # The total uses the combined rate, so it is never off by a rounded cent
         # from summing the layers. The layers are the breakdown for display.
         return TaxResult(
@@ -195,6 +234,7 @@ class TaxEngine:
             total_tax=money(amount * row.combined),
             layers=layers,
             rate_version=self.rate_version,
+            source=row.source,
         )
 
 

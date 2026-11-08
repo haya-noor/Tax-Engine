@@ -34,5 +34,6 @@ Some ZIPs get the wrong city's rate:
 | 98033 | Seattle 10.55% | Kirkland 10.40% |
 | 98499 | Tacoma 10.50% | Lakewood 10.30% |
 
-These overcharge. The fix is to look up the full address (DOR's address rate
-lookup, or the ZIP+4 file) instead of the ZIP5.
+These overcharge when only the ZIP is known. With a street address, the engine
+asks DOR for the exact location instead (see `taxengine/wa_dor.py`), and these
+addresses get the right rate.

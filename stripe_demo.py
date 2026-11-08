@@ -13,13 +13,14 @@ adds our tax to each line, finalizes it, and prints the invoice link.
 """
 
 import argparse
+import logging
 import os
 import sys
 
 import stripe
 
 from adapters.stripe_invoices import CATEGORY_KEY, add_tax_to_invoice, to_cents
-from taxengine import TaxEngine
+from taxengine import TaxEngine, WashingtonResolver
 
 
 def parse_item(text):
@@ -36,18 +37,23 @@ def main():
     parser.add_argument("--zip", default="98101")
     parser.add_argument("--state", default="WA")
     parser.add_argument("--city", default="Seattle")
+    parser.add_argument("--street", default="400 Pine St", help="street address, used for Washington rates")
+    parser.add_argument("--no-dor-lookup", action="store_true",
+                        help="don't ask Washington DOR for the rate by street address; use the ZIP5 table only")
     parser.add_argument("--item", action="append", type=parse_item,
                         help="NAME=PRICE[:CATEGORY], repeat for several items (default: a sample cart)")
     parser.add_argument("--shipping", help="shipping charge, e.g. 8.00 (default: 8.00 with the sample cart)")
     parser.add_argument("--collect-in", default="WA", help="states you collect tax in, comma separated (default: WA)")
     parser.add_argument("--keep-draft", action="store_true", help="don't finalize, so you can inspect the draft")
     args = parser.parse_args()
+    logging.basicConfig(format="note: %(message)s")
 
     key = os.environ.get("STRIPE_SECRET_KEY", "").strip()
     if not key.startswith(("sk_test_", "rk_test_")):
         sys.exit("Set STRIPE_SECRET_KEY to a Stripe TEST key (sk_test_...). Live keys are refused.")
     client = stripe.StripeClient(key)
-    engine = TaxEngine(collect_in=args.collect_in.split(","))
+    wa = WashingtonResolver.from_files(use_web_lookup=not args.no_dor_lookup)
+    engine = TaxEngine(collect_in=args.collect_in.split(","), resolvers={"WA": wa})
     items = args.item or [("T-shirt", "25.00", "clothing"), ("Bread", "4.50", "groceries"),
                           ("Ebook", "9.99", "digital_goods")]
     shipping = args.shipping or (None if args.item else "8.00")
@@ -57,7 +63,7 @@ def main():
     customer = client.v1.customers.create({
         "name": "Tax Engine Test Customer",
         "email": "tax-engine-test@example.com",   # Stripe needs one to send an invoice
-        "address": {"line1": "100 Test St", "city": args.city, "state": args.state,
+        "address": {"line1": args.street, "city": args.city, "state": args.state,
                     "postal_code": args.zip, "country": "US"},
     })
     invoice = client.v1.invoices.create({

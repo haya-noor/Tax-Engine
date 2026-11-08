@@ -2,6 +2,7 @@
 
 from .core import (
     DEFAULT_RATES_DIR,
+    Address,
     AmbiguousZipError,
     TaxEngine,
     TaxResult,
@@ -12,8 +13,11 @@ from .core import (
 )
 from .cart import CartLine, CartResult, calculate_cart
 from .taxability import UnknownCategoryError, load_taxability
+from .wa_dor import WashingtonResolver
 
 __all__ = [
+    "Address",
+    "WashingtonResolver",
     "CartLine",
     "CartResult",
     "UnknownCategoryError",

@@ -124,7 +124,34 @@ Things to know about the data:
 - ZIPs that cross a state line appear in two states' files; the engine asks for the state instead of guessing.
 - No-tax states are included with 0% rates.
 - Leading zeros matter (Boston is `02108`); the engine pads ZIPs back to 5 digits.
-- One ZIP can cover more than one city or county, so ZIP-based rates can be slightly off. Address-level rates can replace them later.
+- One ZIP can cover more than one city or county, so a ZIP-based rate can be the wrong city's. For
+  Washington, rates by street address fix this (next section).
+
+## Rates by street address
+
+A state can have a resolver that finds the rate from the full address. When it
+finds one, that rate is used; otherwise the engine falls back to the ZIP table.
+
+```python
+from taxengine import Address, TaxEngine, WashingtonResolver
+
+wa = WashingtonResolver.from_files(use_web_lookup=True)
+engine = TaxEngine(collect_in={"WA"}, resolvers={"WA": wa})
+home = Address("450 110th Ave NE", "Bellevue", "WA", "98004")
+engine.calculate("98004", "100", "WA", address=home).total_tax   # 10.30, Bellevue; the ZIP alone gives Seattle's 10.55
+```
+
+Washington's resolver uses the Department of Revenue (DOR) in this order:
+
+1. the quarterly ZIP+4 file, when the ZIP has 9 digits and the file is in `data/wa-dor/`;
+2. DOR's [address lookup service](https://dor.wa.gov/wa-sales-tax-rate-lookup-url-interface), when there is a street (needs the network);
+3. the ZIP table.
+
+The result's `source` says which was used (`dor-zip4`, `dor-address` or `zip5`).
+A failed lookup logs a warning. `calculate_cart` takes the same `address=`, and
+the Stripe adapter passes the invoice's street address. The Stripe demo and
+webhook turn the DOR lookup on (`--no-dor-lookup` or `TAXENGINE_DOR_LOOKUP=0`
+turns it off).
 
 ## Quick start
 
@@ -132,16 +159,19 @@ Things to know about the data:
     python try_it.py 88240 59.99 --state TX
     python try_it.py 60601 100 --state IL --collect-in IL
     python try_it.py 98101 4.50 --state WA --category groceries
+    python try_it.py 98004 100 --state WA --street "450 110th Ave NE" --city Bellevue
     python -m unittest -v
 
 No extra libraries are needed (Python 3.10+).
 
 ## Project layout
 
-    taxengine/        the engine (no platform code): core.py, cart.py, taxability.py
+    taxengine/        the engine (no platform code): core.py, cart.py, taxability.py,
+                      wa_dor.py (Washington rates by address)
     adapters/         connections to other systems (Stripe so far)
     data/             rate tables, and product rules per state in data/taxability/
                       official figures to check against in data/validation/
+                      optional Washington DOR files in data/wa-dor/
     tests/            tests, with small sample rate files in tests/fixtures/
     try_it.py         try it from the command line
     stripe_demo.py    make a Stripe test invoice with our tax

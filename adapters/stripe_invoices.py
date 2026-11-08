@@ -11,12 +11,12 @@ Stripe's guide: https://docs.stripe.com/invoicing/taxes/manual-tax-amounts
 
 from decimal import Decimal
 
-from taxengine import CartLine, calculate_cart, money
+from taxengine import Address, CartLine, calculate_cart, money
 from taxengine.taxability import GENERAL, SHIPPING
 
 CATEGORY_KEY = "tax_category"
-STRIPE_LEVEL = {"state": "state", "county": "county", "city": "city", "special": "district"}
-LAYER_NAME = {"state": "State", "county": "County", "city": "City", "special": "Special district"}
+STRIPE_LEVEL = {"state": "state", "county": "county", "city": "city", "special": "district", "local": "multiple"}
+LAYER_NAME = {"state": "State", "county": "County", "city": "City", "special": "Special district", "local": "Local"}
 
 
 class NoTaxAddressError(ValueError):
@@ -36,13 +36,19 @@ def to_dollars(cents):
     return Decimal(cents) / 100
 
 
-def invoice_address(invoice):
-    """The address to tax: the shipping address if there is one, else the billing address."""
+def invoice_street_address(invoice):
+    """The address to tax, as an Address: the shipping address if there is one, else the billing address."""
     shipping = invoice.get("customer_shipping") or {}
     address = shipping.get("address") or invoice.get("customer_address") or {}
     if address.get("country") not in (None, "US") or not address.get("postal_code") or not address.get("state"):
         raise NoTaxAddressError(f"Invoice {invoice.get('id')} has no US address with a ZIP code and state")
-    return address["postal_code"], address["state"]
+    return Address(address.get("line1") or "", address.get("city") or "", address["state"], address["postal_code"])
+
+
+def invoice_address(invoice):
+    """The (ZIP code, state) to tax."""
+    address = invoice_street_address(invoice)
+    return address.zip_code, address.state
 
 
 def taxable_cents(line):
@@ -97,7 +103,8 @@ def add_tax_to_invoice(client, engine, invoice_id):
     invoice = plain(client.v1.invoices.retrieve(invoice_id))
     if invoice["status"] != "draft":
         raise ValueError(f"Invoice {invoice_id} is {invoice['status']}; tax can only be set on drafts")
-    zip_code, state = invoice_address(invoice)
+    address = invoice_street_address(invoice)
+    zip_code, state = address.zip_code, address.state
 
     lines = [plain(line) for line in client.v1.invoices.line_items.list(invoice_id, {"limit": 100}).auto_paging_iter()]
     lines = [line for line in lines if taxable_cents(line) > 0]    # credits and free lines carry no tax
@@ -105,10 +112,11 @@ def add_tax_to_invoice(client, engine, invoice_id):
     goods = [CartLine(line["id"], to_dollars(taxable_cents(line)), category=categories[line["id"]])
              for line in lines if categories[line["id"]] != SHIPPING]
 
-    taxes = {t.line_id: t for t in calculate_cart(engine, zip_code, state, goods).lines}
+    taxes = {t.line_id: t for t in calculate_cart(engine, zip_code, state, goods, address=address).lines}
     for line in lines:
         if categories[line["id"]] == SHIPPING:
-            shipping = calculate_cart(engine, zip_code, state, goods, shipping=to_dollars(taxable_cents(line))).shipping
+            shipping = calculate_cart(engine, zip_code, state, goods, shipping=to_dollars(taxable_cents(line)),
+                                      address=address).shipping
             taxes[line["id"]] = shipping
 
     total = 0
