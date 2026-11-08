@@ -15,6 +15,7 @@ Invoices you create by hand in the Dashboard get the event before you add
 items, so for those use stripe_demo.py or call add_tax_to_invoice() yourself.
 """
 
+import logging
 import os
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -22,7 +23,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import stripe
 
 from adapters.stripe_invoices import NoTaxAddressError, add_tax_to_invoice
-from taxengine import TaxEngine
+from taxengine import TaxEngine, WashingtonResolver
 
 PORT = int(os.environ.get("PORT", "4242"))
 
@@ -58,12 +59,15 @@ def make_handler(client, engine, webhook_secret):
 
 
 def main():
+    logging.basicConfig(format="note: %(message)s")
     key = os.environ.get("STRIPE_SECRET_KEY", "").strip()
     secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "").strip()
     if not key.startswith(("sk_test_", "rk_test_")) or not secret:
         sys.exit("Set STRIPE_SECRET_KEY (a test key, sk_test_...) and STRIPE_WEBHOOK_SECRET (whsec_...).")
     collect_in = os.environ.get("TAXENGINE_COLLECT_IN")
-    engine = TaxEngine(collect_in=collect_in.split(",") if collect_in else None)
+    # Washington rates by street address from DOR; set TAXENGINE_DOR_LOOKUP=0 to use ZIP5 only.
+    wa = WashingtonResolver.from_files(use_web_lookup=os.environ.get("TAXENGINE_DOR_LOOKUP", "1") != "0")
+    engine = TaxEngine(collect_in=collect_in.split(",") if collect_in else None, resolvers={"WA": wa})
     server = HTTPServer(("localhost", PORT), make_handler(stripe.StripeClient(key), engine, secret))
     print(f"Listening on http://localhost:{PORT}/webhook")
     server.serve_forever()

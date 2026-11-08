@@ -57,16 +57,19 @@ class CartResult:
         return "\n".join(out)
 
 
-def calculate_cart(engine, zip_code, state, lines, shipping=0):
-    """Tax every line of a cart, plus shipping, for one shipping address."""
+def calculate_cart(engine, zip_code, state, lines, shipping=0, address=None):
+    """Tax every line of a cart, plus shipping, for one shipping address.
+
+    address: optional Address, for rates by street address (see TaxEngine).
+    """
     state = state.upper()
     zip_code = normalize_zip(zip_code)
-    results = [_tax_line(engine, zip_code, state, line.id, line.net, line.category) for line in lines]
+    results = [_tax_line(engine, zip_code, state, line.id, line.net, line.category, address) for line in lines]
 
     shipping_tax = None
     shipping = money(shipping)
     if shipping:
-        shipping_tax = _tax_shipping(engine, zip_code, state, shipping, results)
+        shipping_tax = _tax_shipping(engine, zip_code, state, shipping, results, address)
 
     all_taxes = results + ([shipping_tax] if shipping_tax else [])
     return CartResult(
@@ -79,18 +82,18 @@ def calculate_cart(engine, zip_code, state, lines, shipping=0):
     )
 
 
-def _tax_line(engine, zip_code, state, line_id, amount, category):
+def _tax_line(engine, zip_code, state, line_id, amount, category, address=None):
     rule = rule_for(engine.taxability, state, category)
     if rule.taxable == "yes":
-        return LineTax(line_id, rule.category, True, engine.calculate(zip_code, amount, state=state))
+        return LineTax(line_id, rule.category, True, engine.calculate(zip_code, amount, state=state, address=address))
     reason = f"exempt: {rule.category}"
     return LineTax(line_id, rule.category, False, untaxed(zip_code, state, amount, engine.rate_version, reason))
 
 
-def _tax_shipping(engine, zip_code, state, shipping, results):
+def _tax_shipping(engine, zip_code, state, shipping, results, address):
     rule = rule_for(engine.taxability, state, SHIPPING)
     if rule.taxable != "proportional":
-        return _tax_line(engine, zip_code, state, SHIPPING, shipping, SHIPPING)
+        return _tax_line(engine, zip_code, state, SHIPPING, shipping, SHIPPING, address)
     # Taxed in the same share as the goods, by price.
     goods = sum((t.tax.amount for t in results), money(0))
     taxable_goods = sum((t.tax.amount for t in results if t.taxable), money(0))
@@ -99,4 +102,4 @@ def _tax_shipping(engine, zip_code, state, shipping, results):
     if not taxable_part:
         reason = "exempt: shipping for exempt goods"
         return LineTax(SHIPPING, SHIPPING, False, untaxed(zip_code, state, shipping, engine.rate_version, reason))
-    return LineTax(SHIPPING, SHIPPING, True, engine.calculate(zip_code, taxable_part, state=state))
+    return LineTax(SHIPPING, SHIPPING, True, engine.calculate(zip_code, taxable_part, state=state, address=address))

@@ -1,2 +1,3 @@
 State,ZipCode,TaxRegionName,EstimatedCombinedRate,StateRate,EstimatedCountyRate,EstimatedCityRate,EstimatedSpecialRate,RiskLevel
 WA,98101,SEATTLE,0.105500,0.065000,0.000000,0.040500,0.000000,0
+WA,98004,SEATTLE,0.105500,0.065000,0.000000,0.040500,0.000000,0
