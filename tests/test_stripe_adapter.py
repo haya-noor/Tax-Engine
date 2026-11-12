@@ -31,7 +31,7 @@ class FakeStripe:
     """Just enough of stripe.StripeClient().v1.invoices for the adapter."""
 
     def __init__(self, invoice, lines):
-        self.invoice, self.lines, self.updates = invoice, lines, {}
+        self.invoice, self.lines, self.updates, self.records = invoice, lines, {}, []
         self.invoice_item_metadata = {}
         self.v1 = self
         self.invoices = self
@@ -46,8 +46,12 @@ class FakeStripe:
     def list(self, invoice_id, params):
         return FakePage(StripeLike(line) for line in self.lines)
 
-    def update(self, invoice_id, line_id, params):
-        self.updates[line_id] = params["tax_amounts"]
+    def update(self, invoice_id, line_id_or_params, params=None):
+        if params is None:      # invoices.update(invoice_id, {"metadata": ...})
+            self.records.append(line_id_or_params["metadata"])
+            self.invoice.setdefault("metadata", {}).update(line_id_or_params["metadata"])
+            return
+        self.updates[line_id_or_params] = params["tax_amounts"]
 
 
 def chicago_invoice(**changes):
@@ -196,6 +200,26 @@ class WebhookEventTest(unittest.TestCase):
                           [line])
         handle_event(fake, self.engine, self.event("invoiceitem.updated", {"id": "ii_1", "invoice": "in_1"}), {})
         self.assertEqual(fake.updates["il_1"], "")
+
+
+class InvoiceRecordTest(unittest.TestCase):
+    """The record each taxed invoice carries for the monthly report."""
+
+    def test_record_is_written_once(self):
+        lines = [{"id": "il_shirt", "amount": 4500, "metadata": {"tax_category": "clothing"}},
+                 {"id": "il_bread", "amount": 500, "metadata": {"tax_category": "groceries"}}]
+        fake = FakeStripe(chicago_invoice(customer_address={"postal_code": "98101", "state": "WA", "country": "US"}),
+                          lines)
+        engine = TaxEngine(FIXTURES)
+        add_tax_to_invoice(fake, engine, "in_1")
+        record = fake.records[-1]
+        self.assertEqual(record["tax_engine_state"], "WA")
+        self.assertEqual(record["tax_engine_gross_cents"], "5000")
+        self.assertEqual(record["tax_engine_taxable_cents"], "4500")
+        self.assertEqual(int(record["tax_engine_state_tax_cents"]) + int(record["tax_engine_local_tax_cents"]), 475)
+        self.assertEqual(record["tax_engine_location"], "")        # ZIP table: no DOR code
+        add_tax_to_invoice(fake, engine, "in_1")                   # same again: nothing new to write
+        self.assertEqual(len(fake.records), 1)
 
 
 class RealStripeObjectTest(unittest.TestCase):

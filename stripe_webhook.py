@@ -7,14 +7,15 @@ an hour, and this server adds our tax in that window, before Stripe finalizes.
 Try it locally with the Stripe CLI (test mode):
 
     $env:STRIPE_SECRET_KEY = "sk_test_..."
-    stripe listen --api-key $env:STRIPE_SECRET_KEY --events invoice.created,invoice.updated,invoiceitem.created,invoiceitem.updated,invoiceitem.deleted --forward-to localhost:4242/webhook
+    stripe listen --api-key $env:STRIPE_SECRET_KEY --events invoice.created,invoice.updated,invoiceitem.created,invoiceitem.deleted --forward-to localhost:4242/webhook
     (it prints a whsec_... secret)
     $env:STRIPE_WEBHOOK_SECRET = "whsec_..."
     python stripe_webhook.py
 
-It also listens for "invoiceitem.created", "invoiceitem.updated" and
+It also listens for "invoice.updated", "invoiceitem.created" and
 "invoiceitem.deleted", so an invoice you build by hand in the Dashboard gets its
-tax recalculated each time you add, change or remove an item. By the time you
+tax recalculated each time you add, change or remove an item. (Stripe has no
+"invoiceitem.updated" event; a changed price arrives as "invoice.updated".) By the time you
 press Send, the tax is on it. (Give it a second or two after the last item.)
 
 To run it for real, without your computer, host it anywhere that runs Python
@@ -38,6 +39,10 @@ HOST = os.environ.get("HOST", "localhost")    # 0.0.0.0 when hosted
 
 def make_handler(client, engine, webhook_secret):
     class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            # Health check for the hosting service: "is the server up?"
+            self.reply(200, "tax engine webhook: ok")
+
         def do_POST(self):
             if self.path != "/webhook":
                 return self.reply(404, "not found")

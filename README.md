@@ -116,16 +116,29 @@ when you press Send. Tax only changes on drafts; sent invoices are left alone.
 
 Try it on your computer (in two PowerShell windows, both with STRIPE_SECRET_KEY set):
 
-    stripe listen --api-key $env:STRIPE_SECRET_KEY --events invoice.created,invoice.updated,invoiceitem.created,invoiceitem.updated,invoiceitem.deleted --forward-to localhost:4242/webhook
+    stripe listen --api-key $env:STRIPE_SECRET_KEY --events invoice.created,invoice.updated,invoiceitem.created,invoiceitem.deleted --forward-to localhost:4242/webhook
     # it prints a whsec_... secret
     $env:STRIPE_WEBHOOK_SECRET = "whsec_..."
     python stripe_webhook.py
 
-To run it all the time, host it on any server that runs Python (set
-`HOST=0.0.0.0`, `PORT`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`) and add
-its `https://.../webhook` URL in the Stripe Dashboard under Developers >
-Webhooks, with the events `invoice.created`, `invoice.updated`, `invoiceitem.created`,
-`invoiceitem.updated` and `invoiceitem.deleted`.
+To run it all the time, host it: `render.yaml` sets it up on Render, and
+[docs/hosting.md](docs/hosting.md) walks through it, including registering the
+webhook in the Stripe Dashboard. Any server that runs Python works (set
+`HOST=0.0.0.0`, `PORT`, `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`).
+
+### Monthly report
+
+Each invoice the engine taxes keeps a small record in its metadata (keys starting
+`tax_engine_`): the DOR location code, gross and taxable sales, and the state and
+local tax. `tax_report.py` adds them up for a month, per location code, which is
+what Washington's excise tax return asks for:
+
+    python tax_report.py 2026-11                  # print the table
+    python tax_report.py 2026-11 --csv nov.csv    # also save a CSV
+
+An invoice counts in the month it was finalized; drafts and voided invoices are
+left out. Invoices taxed before this record existed are listed separately.
+Check the figures before filing.
 
 ## Rate data
 
@@ -191,3 +204,5 @@ No extra libraries are needed (Python 3.10+).
     try_it.py         try it from the command line
     stripe_demo.py    make a Stripe test invoice with our tax
     stripe_webhook.py add our tax to new Stripe invoices automatically
+    tax_report.py     monthly tax report per location, from Stripe invoices
+    render.yaml       hosting setup for the webhook (see docs/hosting.md)

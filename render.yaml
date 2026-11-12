@@ -1,0 +1,19 @@
+# Render blueprint: runs stripe_webhook.py as an always-on web service.
+# In Render: New > Blueprint > pick this repository. It asks for the two secrets.
+services:
+  - type: web
+    name: tax-engine-webhook
+    runtime: python
+    plan: starter            # always on; the free plan sleeps and Stripe's events would arrive late
+    buildCommand: pip install -r requirements-stripe.txt
+    startCommand: python stripe_webhook.py
+    healthCheckPath: /
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: TAXENGINE_COLLECT_IN
+        value: WA
+      - key: STRIPE_SECRET_KEY
+        sync: false          # paste your sk_test_... key in Render
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false          # paste the whsec_... secret from the Stripe webhook endpoint
