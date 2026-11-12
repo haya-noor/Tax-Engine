@@ -71,11 +71,13 @@ class Zip4FileTest(unittest.TestCase):
     def test_location_names(self):
         self.assertEqual(load_location_rates(DOR / "Rates_sample.csv")["1704"].name, "Bellevue")
 
-    def test_files_without_headers_and_any_names(self):
+    def test_files_without_headers_any_names_in_subfolders(self):
         import shutil, tempfile
         with tempfile.TemporaryDirectory() as tmp:
-            for src, dst in (("Rates_sample.csv", "a.txt"), ("Zip4_sample.csv", "b.csv")):
+            # Each in its own subfolder, as unzipping on Windows does.
+            for src, dst in (("Rates_sample.csv", "Rates_26Q4/a.txt"), ("Zip4_sample.csv", "Zip4Q426C/b.csv")):
                 lines = (DOR / src).read_text().splitlines()[1:]     # drop the header
+                (Path(tmp) / dst).parent.mkdir()
                 (Path(tmp) / dst).write_text("\n".join(lines) + "\n")
             wa = WashingtonResolver.from_files(tmp)
             row = wa.resolve(Address("", "", "WA", "98004-1234"))

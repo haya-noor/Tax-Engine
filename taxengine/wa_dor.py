@@ -209,7 +209,8 @@ class WashingtonResolver:
         """Load whichever DOR files are in folder (the unzipped rates file and/or the
         ZIP+4 short file). Files are recognised by their columns, not their names."""
         folder = Path(folder)
-        files = sorted(p for p in folder.glob("*") if p.is_file() and p.suffix.lower() in (".csv", ".txt"))
+        # rglob: unzipping often puts each file in its own subfolder (Rates_26Q4/, Zip4Q426C/).
+        files = sorted(p for p in folder.rglob("*") if p.is_file() and p.suffix.lower() in (".csv", ".txt"))
         rates = [p for p in files if _kind(p) == "rates"]
         zips = [p for p in files if _kind(p) == "zip4"]
         return cls(
