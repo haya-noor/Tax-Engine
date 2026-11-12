@@ -11,8 +11,14 @@ Try it locally with the Stripe CLI (test mode):
     $env:STRIPE_WEBHOOK_SECRET = "whsec_..."
     python stripe_webhook.py
 
-Invoices you create by hand in the Dashboard get the event before you add
-items, so for those use stripe_demo.py or call add_tax_to_invoice() yourself.
+It also listens for "invoiceitem.created", "invoiceitem.updated" and
+"invoiceitem.deleted", so an invoice you build by hand in the Dashboard gets its
+tax recalculated each time you add, change or remove an item. By the time you
+press Send, the tax is on it. (Give it a second or two after the last item.)
+
+To run it for real, without your computer, host it anywhere that runs Python
+(set HOST=0.0.0.0 and PORT), and add its https://.../webhook URL in the Stripe
+Dashboard under Developers > Webhooks, with the events in EVENTS (adapters/stripe_invoices.py).
 """
 
 import logging
@@ -22,10 +28,11 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import stripe
 
-from adapters.stripe_invoices import NoTaxAddressError, add_tax_to_invoice
+from adapters.stripe_invoices import EVENTS, handle_event
 from taxengine import TaxEngine, WashingtonResolver
 
 PORT = int(os.environ.get("PORT", "4242"))
+HOST = os.environ.get("HOST", "localhost")    # 0.0.0.0 when hosted
 
 
 def make_handler(client, engine, webhook_secret):
@@ -40,14 +47,9 @@ def make_handler(client, engine, webhook_secret):
             except (ValueError, stripe.SignatureVerificationError):
                 return self.reply(400, "bad signature")
 
-            if event.type == "invoice.created":
-                invoice = event.data.object.to_dict()
-                if invoice["status"] == "draft" and not (invoice.get("automatic_tax") or {}).get("enabled"):
-                    try:
-                        cents = add_tax_to_invoice(client, engine, invoice["id"])
-                        print(f"{invoice['id']}: added tax {cents / 100:.2f}")
-                    except (NoTaxAddressError, LookupError) as e:
-                        print(f"{invoice['id']}: no tax added: {e}")
+            note = handle_event(client, engine, event.to_dict())
+            if note:
+                print(note, flush=True)
             self.reply(200, "ok")
 
         def reply(self, code, text):
@@ -68,8 +70,8 @@ def main():
     # Washington rates by street address from DOR; set TAXENGINE_DOR_LOOKUP=0 to use ZIP5 only.
     wa = WashingtonResolver.from_files(use_web_lookup=os.environ.get("TAXENGINE_DOR_LOOKUP", "1") != "0")
     engine = TaxEngine(collect_in=collect_in.split(",") if collect_in else None, resolvers={"WA": wa})
-    server = HTTPServer(("localhost", PORT), make_handler(stripe.StripeClient(key), engine, secret))
-    print(f"Listening on http://localhost:{PORT}/webhook")
+    server = HTTPServer((HOST, PORT), make_handler(stripe.StripeClient(key), engine, secret))
+    print(f"Listening on http://{HOST}:{PORT}/webhook for: {', '.join(EVENTS)}")
     server.serve_forever()
 
 

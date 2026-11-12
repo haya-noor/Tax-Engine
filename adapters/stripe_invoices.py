@@ -93,7 +93,7 @@ def line_category(client, line):
     return metadata.get(CATEGORY_KEY) or GENERAL
 
 
-def add_tax_to_invoice(client, engine, invoice_id):
+def add_tax_to_invoice(client, engine, invoice_id, memo=None):
     """Calculate and set tax on every line of a draft invoice. Returns total tax in cents.
 
     client is a stripe.StripeClient; engine is a taxengine.TaxEngine. Each line's
@@ -120,10 +120,58 @@ def add_tax_to_invoice(client, engine, invoice_id):
             taxes[line["id"]] = shipping
 
     total = 0
+    by_id = {line["id"]: line for line in lines}
     for line_id, line_tax in taxes.items():
         amounts = tax_amounts_for(line_tax.tax) if line_tax.taxable else []
-        if not amounts:
-            continue    # exempt, or a state we don't collect in
-        client.v1.invoices.line_items.update(invoice_id, line_id, {"tax_amounts": amounts})
         total += sum(a["amount"] for a in amounts)
+        wanted = sorted((a["amount"], a["taxable_amount"]) for a in amounts)
+        # Skip when the tax is already right. Each write makes Stripe send another
+        # event, so writing the same tax again would loop. memo remembers what we
+        # last wrote, in case Stripe reports a line's tax in a shape we don't read.
+        if current_tax(by_id[line_id]) == wanted or (memo is not None and memo.get((invoice_id, line_id)) == wanted):
+            continue
+        # An empty string removes tax that is no longer due (e.g. the item became exempt).
+        client.v1.invoices.line_items.update(invoice_id, line_id, {"tax_amounts": amounts or ""})
+        if memo is not None:
+            memo[(invoice_id, line_id)] = wanted
     return total
+
+
+def current_tax(line):
+    """The (amount, taxable_amount) pairs of the tax already on a line, sorted."""
+    taxes = line.get("taxes") or line.get("tax_amounts") or []
+    return sorted((t.get("amount"), t.get("taxable_amount")) for t in taxes)
+
+
+# Webhook events that can change the tax on a draft invoice.
+EVENTS = ("invoice.created", "invoiceitem.created", "invoiceitem.updated", "invoiceitem.deleted")
+
+
+def invoice_to_tax(event):
+    """The draft invoice id an event is about, or None if there is nothing to do."""
+    obj = event["data"]["object"]
+    if event["type"] == "invoice.created":
+        if obj.get("status") == "draft" and not (obj.get("automatic_tax") or {}).get("enabled"):
+            return obj["id"]
+        return None
+    if event["type"].startswith("invoiceitem."):
+        invoice = obj.get("invoice")
+        return invoice if isinstance(invoice, str) else (invoice or {}).get("id")
+    return None
+
+
+_WRITTEN = {}    # (invoice id, line id) -> tax last written by handle_event
+
+
+def handle_event(client, engine, event, memo=_WRITTEN):
+    """Add or refresh the tax on the invoice an event is about. Returns a log line."""
+    invoice_id = invoice_to_tax(event)
+    if not invoice_id:
+        return None
+    try:
+        cents = add_tax_to_invoice(client, engine, invoice_id, memo)
+        return f"{invoice_id}: tax {cents / 100:.2f} ({event['type']})"
+    except (NoTaxAddressError, LookupError) as e:
+        return f"{invoice_id}: no tax added: {e}"
+    except ValueError as e:     # e.g. already finalized: tax can only change on drafts
+        return f"{invoice_id}: {e}"

@@ -108,9 +108,23 @@ from its metadata, e.g. `tax_category=groceries`; items with
 The demo creates a customer, a draft invoice with the items, adds our tax,
 finalizes it, and prints links to the invoice. Only test keys are accepted.
 
-`stripe_webhook.py` does the same automatically for every new draft invoice
-(for example subscription renewals), the way a tax app does: run it next to
-`stripe listen --forward-to localhost:4242/webhook`. See the file for steps.
+`stripe_webhook.py` does it automatically, the way a tax app does. Stripe tells
+it whenever a draft invoice is created (for example a subscription renewal) or
+an item on a draft is added, changed or removed, and it recalculates that
+invoice's tax. So an invoice you build in the Dashboard already has its tax
+when you press Send. Tax only changes on drafts; sent invoices are left alone.
+
+Try it on your computer:
+
+    stripe listen --forward-to localhost:4242/webhook     # prints a whsec_... secret
+    $env:STRIPE_WEBHOOK_SECRET = "whsec_..."
+    python stripe_webhook.py
+
+To run it all the time, host it on any server that runs Python (set
+`HOST=0.0.0.0`, `PORT`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`) and add
+its `https://.../webhook` URL in the Stripe Dashboard under Developers >
+Webhooks, with the events `invoice.created`, `invoiceitem.created`,
+`invoiceitem.updated` and `invoiceitem.deleted`.
 
 ## Rate data
 
