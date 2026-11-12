@@ -155,6 +155,16 @@ class WebhookEventTest(unittest.TestCase):
         handle_event(fake, self.engine, self.event("invoiceitem.updated", {"id": "ii_1", "invoice": "in_1"}), memo)
         self.assertEqual(fake.updates, {})
 
+    def test_dashboard_edit_of_a_draft_retaxes_it(self):
+        fake = FakeStripe(chicago_invoice(), [{"id": "il_1", "amount": 5100}])
+        handle_event(fake, self.engine, self.event("invoice.updated", chicago_invoice()), {})
+        self.assertEqual(fake.updates["il_1"][0]["taxable_amount"], 5100)
+
+    def test_update_to_a_stripe_tax_invoice_is_ignored(self):
+        fake = FakeStripe(chicago_invoice(), [])
+        event = self.event("invoice.updated", chicago_invoice(automatic_tax={"enabled": True}))
+        self.assertIsNone(handle_event(fake, self.engine, event, {}))
+
     def test_item_without_invoice_is_ignored(self):
         fake = FakeStripe(chicago_invoice(), [])
         self.assertIsNone(handle_event(fake, self.engine, self.event("invoiceitem.created", {"id": "ii_1", "invoice": None}), {}))

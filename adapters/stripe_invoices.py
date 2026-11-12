@@ -152,13 +152,15 @@ def current_tax(line):
 
 
 # Webhook events that can change the tax on a draft invoice.
-EVENTS = ("invoice.created", "invoiceitem.created", "invoiceitem.updated", "invoiceitem.deleted")
+EVENTS = ("invoice.created", "invoice.updated", "invoiceitem.created", "invoiceitem.updated", "invoiceitem.deleted")
 
 
 def invoice_to_tax(event):
     """The draft invoice id an event is about, or None if there is nothing to do."""
     obj = event["data"]["object"]
-    if event["type"] == "invoice.created":
+    # invoice.updated covers edits the Dashboard makes to a draft's lines directly
+    # (e.g. changing a price) and switching "Collect tax automatically" off.
+    if event["type"] in ("invoice.created", "invoice.updated"):
         if obj.get("status") == "draft" and not (obj.get("automatic_tax") or {}).get("enabled"):
             return obj["id"]
         return None
