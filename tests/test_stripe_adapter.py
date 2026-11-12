@@ -165,6 +165,12 @@ class WebhookEventTest(unittest.TestCase):
         self.assertIn("draft", note)
         self.assertEqual(fake.updates, {})
 
+    def test_stripe_tax_invoice_is_left_alone(self):
+        fake = FakeStripe(chicago_invoice(automatic_tax={"enabled": True}), [{"id": "il_1", "amount": 10000}])
+        note = handle_event(fake, self.engine, self.event("invoiceitem.created", {"id": "ii_1", "invoice": "in_1"}), {})
+        self.assertIn("Collect tax automatically", note)
+        self.assertEqual(fake.updates, {})
+
     def test_tax_already_right_is_not_written_again(self):
         # Writing tax makes Stripe send another event; skipping a no-op update stops the loop.
         line = {"id": "il_1", "amount": 10000,

@@ -48,7 +48,10 @@ def make_handler(client, engine, webhook_secret):
             except (ValueError, stripe.SignatureVerificationError):
                 return self.reply(400, "bad signature")
 
-            note = handle_event(client, engine, event.to_dict())
+            try:
+                note = handle_event(client, engine, event.to_dict())
+            except Exception as e:     # e.g. a Stripe API error: show it instead of dropping the request
+                note = f"{event.type}: failed: {e}"
             if note:
                 print(note, flush=True)
             self.reply(200, "ok")

@@ -103,6 +103,9 @@ def add_tax_to_invoice(client, engine, invoice_id, memo=None):
     invoice = plain(client.v1.invoices.retrieve(invoice_id))
     if invoice["status"] != "draft":
         raise ValueError(f"Invoice {invoice_id} is {invoice['status']}; tax can only be set on drafts")
+    if (invoice.get("automatic_tax") or {}).get("enabled"):
+        raise ValueError(f"Invoice {invoice_id} has 'Collect tax automatically' (Stripe Tax) on; "
+                         "turn it off so this engine can set the tax")
     address = invoice_street_address(invoice)
     zip_code, state = address.zip_code, address.state
 
