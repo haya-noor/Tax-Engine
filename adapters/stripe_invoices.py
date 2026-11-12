@@ -152,7 +152,8 @@ def current_tax(line):
 
 
 # Webhook events that can change the tax on a draft invoice.
-EVENTS = ("invoice.created", "invoice.updated", "invoiceitem.created", "invoiceitem.updated", "invoiceitem.deleted")
+# Stripe has no "invoiceitem.updated" event: a changed item arrives as invoice.updated.
+EVENTS = ("invoice.created", "invoice.updated", "invoiceitem.created", "invoiceitem.deleted")
 
 
 def invoice_to_tax(event):
