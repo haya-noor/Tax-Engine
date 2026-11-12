@@ -7,7 +7,8 @@ an hour, and this server adds our tax in that window, before Stripe finalizes.
 Try it locally with the Stripe CLI (test mode):
 
     $env:STRIPE_SECRET_KEY = "sk_test_..."
-    stripe listen --forward-to localhost:4242/webhook      (prints a whsec_... secret)
+    stripe listen --api-key $env:STRIPE_SECRET_KEY --events invoice.created,invoiceitem.created,invoiceitem.updated,invoiceitem.deleted --forward-to localhost:4242/webhook
+    (it prints a whsec_... secret)
     $env:STRIPE_WEBHOOK_SECRET = "whsec_..."
     python stripe_webhook.py
 
