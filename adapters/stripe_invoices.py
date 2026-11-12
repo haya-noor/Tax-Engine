@@ -57,6 +57,11 @@ def taxable_cents(line):
     return line["amount"] - discounts
 
 
+def jurisdiction_name(result):
+    """ZIP tables use upper-case names (SEATTLE -> Seattle); address sources are already readable."""
+    return result.region.title() if result.source == "zip5" else result.region
+
+
 def tax_amounts_for(result):
     """Turn an engine TaxResult into Stripe's tax_amounts list for one line."""
     amounts = []
@@ -71,7 +76,7 @@ def tax_amounts_for(result):
                 "percentage": float(layer.rate * 100),
                 "inclusive": False,
                 "tax_type": "sales_tax",
-                "jurisdiction": result.state if layer.layer == "state" else result.region.title(),
+                "jurisdiction": result.state if layer.layer == "state" else jurisdiction_name(result),
                 "jurisdiction_level": STRIPE_LEVEL[layer.layer],
                 "country": "US",
                 "state": result.state,

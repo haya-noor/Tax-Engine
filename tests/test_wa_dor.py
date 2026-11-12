@@ -71,6 +71,16 @@ class Zip4FileTest(unittest.TestCase):
     def test_location_names(self):
         self.assertEqual(load_location_rates(DOR / "Rates_sample.csv")["1704"].name, "Bellevue")
 
+    def test_files_without_headers_and_any_names(self):
+        import shutil, tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            for src, dst in (("Rates_sample.csv", "a.txt"), ("Zip4_sample.csv", "b.csv")):
+                lines = (DOR / src).read_text().splitlines()[1:]     # drop the header
+                (Path(tmp) / dst).write_text("\n".join(lines) + "\n")
+            wa = WashingtonResolver.from_files(tmp)
+            row = wa.resolve(Address("", "", "WA", "98004-1234"))
+        self.assertEqual((row.region, row.combined), ("Bellevue (1704)", Decimal("0.103")))
+
 
 class EngineWithAddressTest(unittest.TestCase):
     def engine(self, answers=None, files=True):
@@ -88,6 +98,8 @@ class EngineWithAddressTest(unittest.TestCase):
         self.assertEqual(result.total_tax, Decimal("10.30"))
         self.assertEqual(result.source, "dor-address")
         self.assertEqual(result.region, "Bellevue (1704)")
+        no_names = self.engine({"450 110th Ave NE": "LocationCode=1704 Rate=0.103 ResultCode=0"}, files=False)
+        self.assertEqual(no_names.calculate("98004", "100", "WA", address=BELLEVUE).region, "Location 1704")
         self.assertEqual([(l.layer, l.tax) for l in result.balanced_layers()],
                          [("state", Decimal("6.50")), ("local", Decimal("3.80"))])
 
@@ -121,6 +133,7 @@ class EngineWithAddressTest(unittest.TestCase):
         self.assertEqual(add_tax_to_invoice(fake, engine, "in_1"), 1030)
         levels = [a["tax_rate_data"]["jurisdiction_level"] for a in fake.updates["il_1"]]
         self.assertEqual(levels, ["state", "multiple"])
+        self.assertEqual(fake.updates["il_1"][1]["tax_rate_data"]["jurisdiction"], "Bellevue (1704)")
 
 
 if __name__ == "__main__":

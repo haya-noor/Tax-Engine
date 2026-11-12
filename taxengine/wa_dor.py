@@ -27,7 +27,7 @@ from pathlib import Path
 
 from .core import Address, RateRow, normalize_zip  # noqa: F401  (Address re-exported)
 
-# Drop DOR's quarterly files here (unzipped): a Rates*.csv and/or a Zip4*.csv.
+# Drop DOR's quarterly files here, unzipped (.csv or .txt, any names).
 DEFAULT_DOR_DIR = Path(__file__).resolve().parent.parent / "data" / "wa-dor"
 
 log = logging.getLogger(__name__)
@@ -49,9 +49,44 @@ class Location:
     rate: Decimal
 
 
-def _cols(rec):
-    """Row keys upper-cased and stripped, so small header changes don't matter."""
-    return {k.strip().upper(): (v or "").strip() for k, v in rec.items() if k}
+RATES_COLUMNS = ["NAME", "CODE", "STATE", "LOCAL", "RTA", "RATE", "EFFECTIVE DATE", "EXPIRATION DATE"]
+ZIP4_COLUMNS = ["ZIP", "PLUS4_LOW", "PLUS4_HIGH", "CODE", "STATE", "LOCAL", "TOT_RATE", "EFF_START", "EFF_END"]
+
+
+def _rows(path, columns):
+    """Rows of a DOR file as dicts keyed by upper-case column name.
+
+    Works with or without a header row; without one, columns gives the order.
+    """
+    with open(path, newline="", encoding="utf-8-sig") as f:
+        reader = csv.reader(f)
+        first = next(reader, None)
+        if first is None:
+            return
+        header = [c.strip().upper() for c in first]
+        if "CODE" in header:
+            keys = header
+        else:
+            keys = columns
+            yield dict(zip(keys, (c.strip() for c in first)))
+        for row in reader:
+            if row:
+                yield dict(zip(keys, (c.strip() for c in row)))
+
+
+def _kind(path):
+    """'rates', 'zip4' or None, from the header or the number of columns."""
+    try:
+        with open(path, newline="", encoding="utf-8-sig") as f:
+            first = next(csv.reader(f), [])
+    except (OSError, UnicodeDecodeError):
+        return None
+    header = [c.strip().upper() for c in first]
+    if "PLUS4_LOW" in header or (len(first) == len(ZIP4_COLUMNS) and "CODE" not in header):
+        return "zip4"
+    if "RTA" in header or (len(first) == len(RATES_COLUMNS) and "CODE" not in header):
+        return "rates"
+    return None
 
 
 def load_location_rates(path):
@@ -61,11 +96,9 @@ def load_location_rates(path):
     LOCAL already includes any RTA rate, so RATE = STATE + LOCAL.
     """
     out = {}
-    with open(path, newline="", encoding="utf-8-sig") as f:
-        for rec in csv.DictReader(f):
-            rec = _cols(rec)
-            code = rec["CODE"].zfill(4)
-            out[code] = Location(code, rec["NAME"], Decimal(rec["STATE"]), Decimal(rec["LOCAL"]), Decimal(rec["RATE"]))
+    for rec in _rows(path, RATES_COLUMNS):
+        code = rec["CODE"].zfill(4)
+        out[code] = Location(code, rec["NAME"], Decimal(rec["STATE"]), Decimal(rec["LOCAL"]), Decimal(rec["RATE"]))
     return out
 
 
@@ -89,13 +122,11 @@ class Zip4Table:
     @classmethod
     def load(cls, path):
         ranges = {}
-        with open(path, newline="", encoding="utf-8-sig") as f:
-            for rec in csv.DictReader(f):
-                rec = _cols(rec)
-                loc = Location(rec["CODE"].zfill(4), "", Decimal(rec["STATE"]),
-                               Decimal(rec["LOCAL"]), Decimal(rec["TOT_RATE"]))
-                ranges.setdefault(rec["ZIP"].zfill(5), []).append(
-                    (rec["PLUS4_LOW"].zfill(4), rec["PLUS4_HIGH"].zfill(4), loc))
+        for rec in _rows(path, ZIP4_COLUMNS):
+            loc = Location(rec["CODE"].zfill(4), "", Decimal(rec["STATE"]),
+                           Decimal(rec["LOCAL"]), Decimal(rec["TOT_RATE"]))
+            ranges.setdefault(rec["ZIP"].zfill(5), []).append(
+                (rec["PLUS4_LOW"].zfill(4), rec["PLUS4_HIGH"].zfill(4), loc))
         return cls(ranges)
 
     def find(self, zip_code):
@@ -165,7 +196,7 @@ class WashingtonResolver:
     location only. Returns a RateRow, or None to use the ZIP5 table.
 
     names: optional {code: Location} from load_location_rates(), for readable
-    location names such as "Bellevue" instead of "WA location 1704".
+    location names such as "Bellevue (1704)" instead of "Location 1704".
     """
 
     def __init__(self, zip4=None, lookup=None, names=None):
@@ -175,10 +206,12 @@ class WashingtonResolver:
 
     @classmethod
     def from_files(cls, folder=DEFAULT_DOR_DIR, use_web_lookup=False):
-        """Load whichever DOR files are in folder: a Rates*.csv and/or a Zip4*.csv."""
+        """Load whichever DOR files are in folder (the unzipped rates file and/or the
+        ZIP+4 short file). Files are recognised by their columns, not their names."""
         folder = Path(folder)
-        rates = sorted(folder.glob("Rates*.csv"))
-        zips = sorted(folder.glob("Zip4*.csv"))
+        files = sorted(p for p in folder.glob("*") if p.is_file() and p.suffix.lower() in (".csv", ".txt"))
+        rates = [p for p in files if _kind(p) == "rates"]
+        zips = [p for p in files if _kind(p) == "zip4"]
         return cls(
             zip4=Zip4Table.load(zips[-1]) if zips else None,
             lookup=DorAddressLookup() if use_web_lookup else None,
@@ -197,11 +230,11 @@ class WashingtonResolver:
         if not loc:
             return None
         known = self.names.get(loc.code)
-        name = known.name if known and known.name else f"WA location {loc.code}"
+        region = f"{known.name} ({loc.code})" if known and known.name else f"Location {loc.code}"
         return RateRow(
             state="WA",
             zip_code=zip5,
-            region=f"{name} ({loc.code})",
+            region=region,
             combined=loc.rate,
             state_rate=loc.state_rate,
             county_rate=Decimal(0),
