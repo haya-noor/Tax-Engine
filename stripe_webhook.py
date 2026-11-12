@@ -39,6 +39,10 @@ HOST = os.environ.get("HOST", "localhost")    # 0.0.0.0 when hosted
 
 def make_handler(client, engine, webhook_secret):
     class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            # Health check for the hosting service: "is the server up?"
+            self.reply(200, "tax engine webhook: ok")
+
         def do_POST(self):
             if self.path != "/webhook":
                 return self.reply(404, "not found")

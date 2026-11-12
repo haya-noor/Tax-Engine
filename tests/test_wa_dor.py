@@ -136,6 +136,7 @@ class EngineWithAddressTest(unittest.TestCase):
         levels = [a["tax_rate_data"]["jurisdiction_level"] for a in fake.updates["il_1"]]
         self.assertEqual(levels, ["state", "multiple"])
         self.assertEqual(fake.updates["il_1"][1]["tax_rate_data"]["jurisdiction"], "Bellevue (1704)")
+        self.assertEqual(fake.records[-1]["tax_engine_location"], "1704")
 
 
 if __name__ == "__main__":

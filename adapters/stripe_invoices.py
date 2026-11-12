@@ -9,12 +9,14 @@ is finalized.
 Stripe's guide: https://docs.stripe.com/invoicing/taxes/manual-tax-amounts
 """
 
+import re
 from decimal import Decimal
 
 from taxengine import Address, CartLine, calculate_cart, money
 from taxengine.taxability import GENERAL, SHIPPING
 
 CATEGORY_KEY = "tax_category"
+RECORD_PREFIX = "tax_engine_"    # invoice metadata keys written by record_for(); read by the monthly report
 STRIPE_LEVEL = {"state": "state", "county": "county", "city": "city", "special": "district", "local": "multiple"}
 LAYER_NAME = {"state": "State", "county": "County", "city": "City", "special": "Special district", "local": "Local"}
 
@@ -127,6 +129,8 @@ def add_tax_to_invoice(client, engine, invoice_id, memo=None):
                                       address=address).shipping
             taxes[line["id"]] = shipping
 
+    write_record(client, invoice, record_for(taxes.values(), lines, engine.rate_version))
+
     total = 0
     by_id = {line["id"]: line for line in lines}
     for line_id, line_tax in taxes.items():
@@ -143,6 +147,49 @@ def add_tax_to_invoice(client, engine, invoice_id, memo=None):
         if memo is not None:
             memo[(invoice_id, line_id)] = wanted
     return total
+
+
+def location_code(region):
+    """'BELLEVUE RTA (1704)' -> '1704'; '' when the rate came from the ZIP table."""
+    found = re.search(r"\((\d{4})\)\s*$", region or "")
+    return found.group(1) if found else ""
+
+
+def record_for(line_taxes, lines, rate_version=""):
+    """What the monthly report needs about one invoice, as Stripe metadata (strings).
+
+    gross: every line after discounts; taxable: the taxed part; state/local: the tax,
+    split as on the invoice. The location is the DOR location code when the rate came
+    from the street address, else empty (the ZIP-table region is kept in jurisdiction).
+    """
+    gross = sum(taxable_cents(line) for line in lines)
+    taxable = state = local = 0
+    jurisdiction, source, us_state = "", "", ""
+    for t in line_taxes:
+        us_state = us_state or t.tax.state
+        if not t.taxable:
+            continue
+        jurisdiction, source = t.tax.region, t.tax.source
+        for a in tax_amounts_for(t.tax):
+            if a["tax_rate_data"]["jurisdiction_level"] == "state":
+                state += a["amount"]
+            else:
+                local += a["amount"]
+        taxable += to_cents(t.tax.amount)
+    values = {
+        "state": us_state, "location": location_code(jurisdiction), "jurisdiction": jurisdiction,
+        "source": source, "gross_cents": gross, "taxable_cents": taxable,
+        "state_tax_cents": state, "local_tax_cents": local, "rates": rate_version,
+    }
+    return {RECORD_PREFIX + k: str(v) for k, v in values.items()}
+
+
+def write_record(client, invoice, record):
+    """Save the record on the invoice, unless it is already there (a write sends another event)."""
+    current = invoice.get("metadata") or {}
+    if all(current.get(k) == v for k, v in record.items()):
+        return
+    client.v1.invoices.update(invoice["id"], {"metadata": record})
 
 
 def current_tax(line):
