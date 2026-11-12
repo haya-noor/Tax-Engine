@@ -57,6 +57,11 @@ def taxable_cents(line):
     return line["amount"] - discounts
 
 
+def jurisdiction_name(result):
+    """ZIP tables use upper-case names (SEATTLE -> Seattle); address sources are already readable."""
+    return result.region.title() if result.source == "zip5" else result.region
+
+
 def tax_amounts_for(result):
     """Turn an engine TaxResult into Stripe's tax_amounts list for one line."""
     amounts = []
@@ -71,7 +76,7 @@ def tax_amounts_for(result):
                 "percentage": float(layer.rate * 100),
                 "inclusive": False,
                 "tax_type": "sales_tax",
-                "jurisdiction": result.state if layer.layer == "state" else result.region.title(),
+                "jurisdiction": result.state if layer.layer == "state" else jurisdiction_name(result),
                 "jurisdiction_level": STRIPE_LEVEL[layer.layer],
                 "country": "US",
                 "state": result.state,
@@ -103,6 +108,9 @@ def add_tax_to_invoice(client, engine, invoice_id, memo=None):
     invoice = plain(client.v1.invoices.retrieve(invoice_id))
     if invoice["status"] != "draft":
         raise ValueError(f"Invoice {invoice_id} is {invoice['status']}; tax can only be set on drafts")
+    if (invoice.get("automatic_tax") or {}).get("enabled"):
+        raise ValueError(f"Invoice {invoice_id} has 'Collect tax automatically' (Stripe Tax) on; "
+                         "turn it off so this engine can set the tax")
     address = invoice_street_address(invoice)
     zip_code, state = address.zip_code, address.state
 
@@ -144,13 +152,15 @@ def current_tax(line):
 
 
 # Webhook events that can change the tax on a draft invoice.
-EVENTS = ("invoice.created", "invoiceitem.created", "invoiceitem.updated", "invoiceitem.deleted")
+EVENTS = ("invoice.created", "invoice.updated", "invoiceitem.created", "invoiceitem.updated", "invoiceitem.deleted")
 
 
 def invoice_to_tax(event):
     """The draft invoice id an event is about, or None if there is nothing to do."""
     obj = event["data"]["object"]
-    if event["type"] == "invoice.created":
+    # invoice.updated covers edits the Dashboard makes to a draft's lines directly
+    # (e.g. changing a price) and switching "Collect tax automatically" off.
+    if event["type"] in ("invoice.created", "invoice.updated"):
         if obj.get("status") == "draft" and not (obj.get("automatic_tax") or {}).get("enabled"):
             return obj["id"]
         return None

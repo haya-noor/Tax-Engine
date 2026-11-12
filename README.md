@@ -114,16 +114,17 @@ an item on a draft is added, changed or removed, and it recalculates that
 invoice's tax. So an invoice you build in the Dashboard already has its tax
 when you press Send. Tax only changes on drafts; sent invoices are left alone.
 
-Try it on your computer:
+Try it on your computer (in two PowerShell windows, both with STRIPE_SECRET_KEY set):
 
-    stripe listen --forward-to localhost:4242/webhook     # prints a whsec_... secret
+    stripe listen --api-key $env:STRIPE_SECRET_KEY --events invoice.created,invoice.updated,invoiceitem.created,invoiceitem.updated,invoiceitem.deleted --forward-to localhost:4242/webhook
+    # it prints a whsec_... secret
     $env:STRIPE_WEBHOOK_SECRET = "whsec_..."
     python stripe_webhook.py
 
 To run it all the time, host it on any server that runs Python (set
 `HOST=0.0.0.0`, `PORT`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`) and add
 its `https://.../webhook` URL in the Stripe Dashboard under Developers >
-Webhooks, with the events `invoice.created`, `invoiceitem.created`,
+Webhooks, with the events `invoice.created`, `invoice.updated`, `invoiceitem.created`,
 `invoiceitem.updated` and `invoiceitem.deleted`.
 
 ## Rate data
