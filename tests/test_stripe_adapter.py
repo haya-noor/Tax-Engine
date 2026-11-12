@@ -4,7 +4,7 @@ import unittest
 from decimal import Decimal
 from pathlib import Path
 
-from adapters.stripe_invoices import NoTaxAddressError, add_tax_to_invoice, tax_amounts_for
+from adapters.stripe_invoices import NoTaxAddressError, add_tax_to_invoice, handle_event, tax_amounts_for
 from taxengine import TaxEngine
 
 FIXTURES = Path(__file__).parent / "fixtures" / "rates"
@@ -132,6 +132,54 @@ class StripeCategoriesTest(unittest.TestCase):
         fake = FakeStripe(self.seattle_invoice(), lines)
         fake.invoice_item_metadata["ii_1"] = {"tax_category": "groceries"}
         self.assertEqual(add_tax_to_invoice(fake, self.engine, "in_1"), 0)
+
+
+class WebhookEventTest(unittest.TestCase):
+    """What the webhook does with each Stripe event."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.engine = TaxEngine(FIXTURES)
+
+    def event(self, type_, obj):
+        return {"type": type_, "data": {"object": obj}}
+
+    def test_item_added_to_draft_taxes_the_invoice(self):
+        fake = FakeStripe(chicago_invoice(), [{"id": "il_1", "amount": 10000}])
+        memo = {}
+        note = handle_event(fake, self.engine, self.event("invoiceitem.created", {"id": "ii_1", "invoice": "in_1"}), memo)
+        self.assertEqual(sum(a["amount"] for a in fake.updates["il_1"]), 1050)
+        self.assertIn("10.50", note)
+        # The write triggers another event; the same tax is not written twice.
+        fake.updates.clear()
+        handle_event(fake, self.engine, self.event("invoiceitem.updated", {"id": "ii_1", "invoice": "in_1"}), memo)
+        self.assertEqual(fake.updates, {})
+
+    def test_item_without_invoice_is_ignored(self):
+        fake = FakeStripe(chicago_invoice(), [])
+        self.assertIsNone(handle_event(fake, self.engine, self.event("invoiceitem.created", {"id": "ii_1", "invoice": None}), {}))
+
+    def test_finalized_invoice_is_left_alone(self):
+        fake = FakeStripe(chicago_invoice(status="open"), [{"id": "il_1", "amount": 10000}])
+        note = handle_event(fake, self.engine, self.event("invoiceitem.updated", {"id": "ii_1", "invoice": "in_1"}), {})
+        self.assertIn("draft", note)
+        self.assertEqual(fake.updates, {})
+
+    def test_tax_already_right_is_not_written_again(self):
+        # Writing tax makes Stripe send another event; skipping a no-op update stops the loop.
+        line = {"id": "il_1", "amount": 10000,
+                "taxes": [{"amount": a, "taxable_amount": 10000} for a in (625, 175, 125, 125)]}
+        fake = FakeStripe(chicago_invoice(), [line])
+        handle_event(fake, self.engine, self.event("invoiceitem.updated", {"id": "ii_1", "invoice": "in_1"}), {})
+        self.assertEqual(fake.updates, {})
+
+    def test_tax_no_longer_due_is_removed(self):
+        line = {"id": "il_1", "amount": 500, "metadata": {"tax_category": "groceries"},
+                "taxes": [{"amount": 53, "taxable_amount": 500}]}
+        fake = FakeStripe(chicago_invoice(customer_address={"postal_code": "98101", "state": "WA", "country": "US"}),
+                          [line])
+        handle_event(fake, self.engine, self.event("invoiceitem.updated", {"id": "ii_1", "invoice": "in_1"}), {})
+        self.assertEqual(fake.updates["il_1"], "")
 
 
 class RealStripeObjectTest(unittest.TestCase):
