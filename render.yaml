@@ -4,7 +4,7 @@ services:
   - type: web
     name: tax-engine-webhook
     runtime: python
-    plan: starter            # always on; the free plan sleeps and Stripe's events would arrive late
+    plan: free               # sleeps after ~15 min idle; "starter" (about $7/month) is always on
     buildCommand: pip install -r requirements-stripe.txt
     startCommand: python stripe_webhook.py
     healthCheckPath: /

@@ -16,10 +16,13 @@ repository using `render.yaml`. Any host that runs Python works the same way.
    `https://tax-engine-webhook.onrender.com`. Open it in a browser: it should say
    `tax engine webhook: ok`.
 
-`render.yaml` uses the `starter` plan (about $7 a month), which is always on. The
-free plan sleeps when idle, so the first event after a quiet spell can time out and
-the tax arrives late, after Stripe retries. That is fine for trying it out: change
-`plan: starter` to `plan: free`.
+`render.yaml` uses Render's **free** plan. It sleeps after about 15 minutes with
+no traffic, and takes up to a minute to wake. Stripe gives up on an event that
+slow and tries again a few minutes later, so after a quiet spell the tax can
+arrive late. Before you send an invoice, check the tax is on it; if it isn't,
+open your Render address in a browser to wake the service, wait a minute, and
+edit the invoice again (any small change). For real customers, switch to the
+always-on plan: change `plan: free` to `plan: starter` (about $7 a month).
 
 ## 2. Tell Stripe where to send events
 
