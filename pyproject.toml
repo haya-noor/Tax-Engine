@@ -1,0 +1,10 @@
+# Used by Vercel to find the webhook and install its dependencies.
+# For local use, pip install -r requirements.txt does the same.
+[project]
+name = "tax-engine"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["stripe>=16.1,<17"]
+
+[tool.vercel]
+entrypoint = "api.vercel_handler:handler"

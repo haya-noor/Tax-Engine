@@ -115,7 +115,7 @@ set to a test key, `sk_test_...`):
     $env:STRIPE_WEBHOOK_SECRET = "whsec_..."
     python stripe_tax_webhook.py
 
-To run it all the time, host it on Vercel (`api/vercel_handler.py`, `vercel.json`):
+To run it all the time, host it on Vercel (`api/vercel_handler.py`, set up in `pyproject.toml`):
 [docs/hosting.md](docs/hosting.md) walks through it, including registering the
 webhook in the Stripe Dashboard. Any server that runs Python also works (set
 `HOST=0.0.0.0`, `PORT`, `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`).
@@ -191,7 +191,7 @@ The engine needs no extra libraries (Python 3.10+); the Stripe parts need
     calculate_tax.py          work out the tax for a ZIP or address from the command line
     stripe_tax_webhook.py     add our tax to Stripe invoices automatically
     monthly_tax_report.py     monthly tax report per location, from Stripe invoices
-    api/vercel_handler.py     runs the webhook on Vercel, with vercel.json (see docs/hosting.md)
+    api/vercel_handler.py     runs the webhook on Vercel; pyproject.toml points Vercel to it
 
     taxengine/                the engine (no platform code)
       tax_calculator.py         rate lookup by ZIP and the tax calculation
@@ -202,6 +202,4 @@ The engine needs no extra libraries (Python 3.10+); the Stripe parts need
       stripe_invoice_tax.py     puts the engine's tax on Stripe invoices
       stripe_monthly_report.py  totals the taxed Stripe invoices for a month
     data/                     rate tables, product rules, Washington DOR files (see data/README.md)
-    tests/                    tests, with small sample files in tests/fixtures/ automatically
-    api/, vercel.json run the webhook on Vercel (see docs/hosting.md)
-    monthly_tax_report.py     monthly tax report per location, from Stripe invoices
+    tests/                    tests, with small sample files in tests/fixtures/

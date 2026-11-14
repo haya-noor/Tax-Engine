@@ -3,8 +3,8 @@
 Run the webhook on a server so tax is added to Stripe invoices all the time,
 without your computer or `stripe listen`. This guide uses
 [Vercel](https://vercel.com): its free Hobby plan needs no card, and it runs
-`api/vercel_handler.py` on each request, so there is no server to keep awake.
-`vercel.json` sends `/webhook` there. Any host that runs Python also works
+`api/vercel_handler.py` on each request (`pyproject.toml` tells it where), so
+there is no server to keep awake. Any host that runs Python also works
 (`python stripe_tax_webhook.py` with `HOST=0.0.0.0` and `PORT` set).
 
 ## 1. Deploy on Vercel
