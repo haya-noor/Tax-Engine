@@ -13,7 +13,7 @@ import re
 from decimal import Decimal
 
 from taxengine import Address, CartLine, calculate_cart, money
-from taxengine.taxability import GENERAL, SHIPPING
+from taxengine.product_taxability import GENERAL, SHIPPING
 
 CATEGORY_KEY = "tax_category"
 RECORD_PREFIX = "tax_engine_"    # invoice metadata keys written by record_for(); read by the monthly report

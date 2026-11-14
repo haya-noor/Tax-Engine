@@ -1,6 +1,6 @@
 """A US sales tax engine: address in, tax out."""
 
-from .core import (
+from .tax_calculator import (
     DEFAULT_RATES_DIR,
     Address,
     AmbiguousZipError,
@@ -11,9 +11,9 @@ from .core import (
     money,
     normalize_zip,
 )
-from .cart import CartLine, CartResult, calculate_cart
-from .taxability import UnknownCategoryError, load_taxability
-from .wa_dor import WashingtonResolver
+from .cart_tax import CartLine, CartResult, calculate_cart
+from .product_taxability import UnknownCategoryError, load_taxability
+from .washington_address_rates import WashingtonResolver
 
 __all__ = [
     "Address",

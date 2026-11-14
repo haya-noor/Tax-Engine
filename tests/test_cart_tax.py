@@ -3,7 +3,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from taxengine import CartLine, TaxEngine, UnknownCategoryError, calculate_cart, load_taxability
-from taxengine.taxability import DEFAULT_TAXABILITY_DIR
+from taxengine.product_taxability import DEFAULT_TAXABILITY_DIR
 
 FIXTURES = Path(__file__).parent / "fixtures" / "rates"
 D = Decimal

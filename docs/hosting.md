@@ -3,9 +3,9 @@
 Run the webhook on a server so tax is added to Stripe invoices all the time,
 without your computer or `stripe listen`. This guide uses
 [Vercel](https://vercel.com): its free Hobby plan needs no card, and it runs
-`api/webhook.py` on each request, so there is no server to keep awake.
+`api/vercel_handler.py` on each request, so there is no server to keep awake.
 `vercel.json` sends `/webhook` there. Any host that runs Python also works
-(`python stripe_webhook.py` with `HOST=0.0.0.0` and `PORT` set).
+(`python stripe_tax_webhook.py` with `HOST=0.0.0.0` and `PORT` set).
 
 ## 1. Deploy on Vercel
 
@@ -34,7 +34,7 @@ without your computer or `stripe listen`. This guide uses
 
 ## 3. Try it
 
-Stop `stripe listen` and `python stripe_webhook.py` on your computer, then create or
+Stop `stripe listen` and `python stripe_tax_webhook.py` on your computer, then create or
 edit a draft invoice for a Washington customer in the Dashboard. The tax appears
 within a few seconds. Vercel's **Logs** tab shows a line per event, such as
 `in_...: tax 6.39 (invoice.updated)`. Stripe's webhook page shows each delivery and
@@ -49,5 +49,5 @@ its response.
 - Washington rates come from DOR's address lookup service, and location names from
   `data/wa-dor/Rates_26Q4.csv`. Replace that file each quarter (the next one is due
   for January 1).
-- For the monthly report, run `python tax_report.py 2026-11` on your computer. It
+- For the monthly report, run `python monthly_tax_report.py 2026-11` on your computer. It
   reads the invoices from Stripe and needs nothing from the server.

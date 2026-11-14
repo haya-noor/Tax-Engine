@@ -2,14 +2,14 @@
 
 Each line is taxed on its own and rounded to the cent (per-line rounding), so
 the cart total is the sum of the lines. Product categories decide whether a
-line is taxed (see taxability.py); shipping follows the state's shipping rule.
+line is taxed (see product_taxability.py); shipping follows the state's shipping rule.
 """
 
 from dataclasses import dataclass
 from decimal import Decimal
 
-from .core import money, normalize_zip, untaxed
-from .taxability import GENERAL, SHIPPING, rule_for
+from .tax_calculator import money, normalize_zip, untaxed
+from .product_taxability import GENERAL, SHIPPING, rule_for
 
 
 @dataclass(frozen=True)

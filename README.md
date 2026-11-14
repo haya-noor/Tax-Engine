@@ -92,7 +92,7 @@ Adapters live in `adapters/` and only translate; the tax logic stays in
 
 ### Stripe invoices (test mode)
 
-`adapters/stripe_invoices.py` adds the engine's tax to a draft Stripe invoice,
+`adapters/stripe_invoice_tax.py` adds the engine's tax to a draft Stripe invoice,
 one tax line per layer, using Stripe's
 [manual tax amounts](https://docs.stripe.com/invoicing/taxes/manual-tax-amounts).
 It taxes the shipping address, or the billing address if there is none, on
@@ -100,7 +100,7 @@ each line's amount after discounts. Each invoice item's product category comes
 from its metadata, e.g. `tax_category=groceries`; items with
 `tax_category=shipping` are delivery charges.
 
-`stripe_webhook.py` does this automatically, the way a tax app does. Stripe tells
+`stripe_tax_webhook.py` does this automatically, the way a tax app does. Stripe tells
 it whenever a draft invoice is created (for example a subscription renewal) or
 an item on a draft is added, changed or removed, and it recalculates that
 invoice's tax. So an invoice you build in the Dashboard already has its tax
@@ -113,9 +113,9 @@ set to a test key, `sk_test_...`):
     stripe listen --api-key $env:STRIPE_SECRET_KEY --events invoice.created,invoice.updated,invoiceitem.created,invoiceitem.deleted --forward-to localhost:4242/webhook
     # it prints a whsec_... secret
     $env:STRIPE_WEBHOOK_SECRET = "whsec_..."
-    python stripe_webhook.py
+    python stripe_tax_webhook.py
 
-To run it all the time, host it on Vercel (`api/webhook.py`, `vercel.json`):
+To run it all the time, host it on Vercel (`api/vercel_handler.py`, `vercel.json`):
 [docs/hosting.md](docs/hosting.md) walks through it, including registering the
 webhook in the Stripe Dashboard. Any server that runs Python also works (set
 `HOST=0.0.0.0`, `PORT`, `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`).
@@ -124,11 +124,11 @@ webhook in the Stripe Dashboard. Any server that runs Python also works (set
 
 Each invoice the engine taxes keeps a small record in its metadata (keys starting
 `tax_engine_`): the DOR location code, gross and taxable sales, and the state and
-local tax. `tax_report.py` adds them up for a month, per location code, which is
+local tax. `monthly_tax_report.py` adds them up for a month, per location code, which is
 what Washington's excise tax return asks for:
 
-    python tax_report.py 2026-11                  # print the table
-    python tax_report.py 2026-11 --csv nov.csv    # also save a CSV
+    python monthly_tax_report.py 2026-11                  # print the table
+    python monthly_tax_report.py 2026-11 --csv nov.csv    # also save a CSV
 
 An invoice counts in the month it was finalized; drafts and voided invoices are
 left out. Invoices taxed before this record existed are listed separately.
@@ -176,11 +176,11 @@ DOR lookup on (`TAXENGINE_DOR_LOOKUP=0` turns it off).
 
 ## Quick start
 
-    python try_it.py 60601 100 --state IL
-    python try_it.py 88240 59.99 --state TX
-    python try_it.py 60601 100 --state IL --collect-in IL
-    python try_it.py 98101 4.50 --state WA --category groceries
-    python try_it.py 98004 100 --state WA --street "450 110th Ave NE" --city Bellevue
+    python calculate_tax.py 60601 100 --state IL
+    python calculate_tax.py 88240 59.99 --state TX
+    python calculate_tax.py 60601 100 --state IL --collect-in IL
+    python calculate_tax.py 98101 4.50 --state WA --category groceries
+    python calculate_tax.py 98004 100 --state WA --street "450 110th Ave NE" --city Bellevue
     python -m unittest -v
 
 The engine needs no extra libraries (Python 3.10+); the Stripe parts need
@@ -188,13 +188,20 @@ The engine needs no extra libraries (Python 3.10+); the Stripe parts need
 
 ## Project layout
 
-    taxengine/        the engine (no platform code): core.py, cart.py, taxability.py,
-                      wa_dor.py (Washington rates by address)
-    adapters/         connections to other systems (Stripe so far)
-    data/             rate tables, product rules per state (data/taxability/),
-                      Washington DOR files (data/wa-dor/); see data/README.md
-    tests/            tests, with small sample files in tests/fixtures/
-    try_it.py         try it from the command line
-    stripe_webhook.py add our tax to Stripe invoices automatically
+    calculate_tax.py          work out the tax for a ZIP or address from the command line
+    stripe_tax_webhook.py     add our tax to Stripe invoices automatically
+    monthly_tax_report.py     monthly tax report per location, from Stripe invoices
+    api/vercel_handler.py     runs the webhook on Vercel, with vercel.json (see docs/hosting.md)
+
+    taxengine/                the engine (no platform code)
+      tax_calculator.py         rate lookup by ZIP and the tax calculation
+      cart_tax.py               tax for a whole cart: lines, discounts, shipping
+      product_taxability.py     which product categories are taxed in each state
+      washington_address_rates.py  Washington rates by street address, from DOR
+    adapters/                 connections to other systems
+      stripe_invoice_tax.py     puts the engine's tax on Stripe invoices
+      stripe_monthly_report.py  totals the taxed Stripe invoices for a month
+    data/                     rate tables, product rules, Washington DOR files (see data/README.md)
+    tests/                    tests, with small sample files in tests/fixtures/ automatically
     api/, vercel.json run the webhook on Vercel (see docs/hosting.md)
-    tax_report.py     monthly tax report per location, from Stripe invoices
+    monthly_tax_report.py     monthly tax report per location, from Stripe invoices

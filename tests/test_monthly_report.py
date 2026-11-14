@@ -1,11 +1,11 @@
-"""Monthly report from invoice records (adapters/stripe_report.py)."""
+"""Monthly report from invoice records (adapters/stripe_monthly_report.py)."""
 
 import csv
 import os
 import tempfile
 import unittest
 
-from adapters.stripe_report import build_report, format_report, month_range, write_csv
+from adapters.stripe_monthly_report import build_report, format_report, month_range, write_csv
 
 NOV_START, NOV_END = month_range(2026, 11)
 

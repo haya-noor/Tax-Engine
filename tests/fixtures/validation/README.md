@@ -1,6 +1,6 @@
 # Validation data
 
-Official figures the engine is checked against by `tests/test_wa_official.py`.
+Official figures the engine is checked against by `tests/test_washington_official_rates.py`.
 
 ## `wa_dor_rates_2026q4.csv`
 
@@ -35,5 +35,5 @@ Some ZIPs get the wrong city's rate:
 | 98499 | Tacoma 10.50% | Lakewood 10.30% |
 
 These overcharge when only the ZIP is known. With a street address, the engine
-asks DOR for the exact location instead (see `taxengine/wa_dor.py`), and these
+asks DOR for the exact location instead (see `taxengine/washington_address_rates.py`), and these
 addresses get the right rate.
