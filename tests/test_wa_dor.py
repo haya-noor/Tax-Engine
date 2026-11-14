@@ -64,7 +64,6 @@ class Zip4FileTest(unittest.TestCase):
         self.assertIsNone(self.table.find("98004-7000"))
 
     def test_split_zip5_has_no_single_answer(self):
-        self.assertTrue(self.table.is_split("98004"))
         self.assertIsNone(self.table.find("98004"))
         self.assertEqual(self.table.find("98101").code, "1726")
 

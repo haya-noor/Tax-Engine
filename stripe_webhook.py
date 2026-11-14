@@ -18,8 +18,9 @@ tax recalculated each time you add, change or remove an item. (Stripe has no
 "invoiceitem.updated" event; a changed price arrives as "invoice.updated".) By the time you
 press Send, the tax is on it. (Give it a second or two after the last item.)
 
-To run it for real, without your computer, host it anywhere that runs Python
-(set HOST=0.0.0.0 and PORT), or on Vercel through api/webhook.py, and add its https://.../webhook URL in the Stripe
+To run it for real, without your computer, host it: on Vercel through
+api/webhook.py (see docs/hosting.md), or anywhere that runs Python with
+HOST=0.0.0.0 and PORT set. Then add its https://.../webhook URL in the Stripe
 Dashboard under Developers > Webhooks, with the events in EVENTS (adapters/stripe_invoices.py).
 """
 

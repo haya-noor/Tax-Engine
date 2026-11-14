@@ -141,10 +141,6 @@ class Zip4Table:
         codes = {loc.code for _, _, loc in ranges}
         return ranges[0][2] if len(codes) == 1 else None
 
-    def is_split(self, zip5):
-        """True when a 5-digit ZIP covers more than one location code."""
-        return len({loc.code for _, _, loc in self.ranges.get(zip5, [])}) > 1
-
 
 def _fetch(url, timeout):
     with urllib.request.urlopen(url, timeout=timeout) as resp:
