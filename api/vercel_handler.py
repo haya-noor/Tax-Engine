@@ -1,9 +1,9 @@
 """Vercel entry point for the Stripe webhook (see docs/hosting.md).
 
-Vercel runs this file on each request instead of a long-running server, using
-the same request handler as stripe_tax_webhook.py. Settings come from the project's
-environment variables: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
-TAXENGINE_COLLECT_IN (and optionally TAXENGINE_DOR_LOOKUP=0).
+pyproject.toml points Vercel at `handler` below. It uses the same request
+handling as stripe_tax_webhook.py. Settings come from the project's environment
+variables: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, TAXENGINE_COLLECT_IN (and
+optionally TAXENGINE_DOR_LOOKUP=0).
 """
 
 import logging
@@ -18,24 +18,25 @@ from stripe_tax_webhook import from_env, make_handler  # noqa: E402
 logging.basicConfig(format="note: %(message)s")
 
 try:
-    _Base = make_handler(*from_env())
+    _impl = make_handler(*from_env())
 except ValueError as e:
     _problem = str(e)
 
-    class _Base(BaseHTTPRequestHandler):
+    class _impl(BaseHTTPRequestHandler):
         """Settings are missing: say so on every request instead of crashing."""
 
         def do_GET(self):
-            self._fail()
+            self.reply(500, f"tax engine webhook: not configured. {_problem}")
 
-        def do_POST(self):
-            self._fail()
+        do_POST = do_GET
 
-        def _fail(self):
-            self.send_response(500)
+        def reply(self, code, text):
+            self.send_response(code)
             self.end_headers()
-            self.wfile.write(f"tax engine webhook: not configured. {_problem}".encode())
+            self.wfile.write(text.encode())
 
 
-class handler(_Base):
-    pass
+class handler(BaseHTTPRequestHandler):
+    do_GET = _impl.do_GET
+    do_POST = _impl.do_POST
+    reply = _impl.reply

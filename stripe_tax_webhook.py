@@ -36,7 +36,7 @@ from taxengine import TaxEngine, WashingtonResolver
 
 PORT = int(os.environ.get("PORT", "4242"))
 HOST = os.environ.get("HOST", "localhost")    # 0.0.0.0 when hosted
-WEBHOOK_PATHS = ("/webhook", "/api/vercel_handler")   # /api/vercel_handler is how Vercel routes it
+WEBHOOK_PATHS = ("/webhook",)
 
 
 def make_handler(client, engine, webhook_secret):
