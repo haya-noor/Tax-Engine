@@ -1,11 +1,37 @@
 # Hosting the Stripe webhook
 
 Run `stripe_webhook.py` on a server so tax is added to Stripe invoices all the
-time, without your computer or `stripe listen`. This guide uses
-[Render](https://render.com), which can run it straight from this GitHub
-repository using `render.yaml`. Any host that runs Python works the same way.
+time, without your computer or `stripe listen`. Two hosts are set
+up: [Vercel](https://vercel.com) (free, no card) and [Render](https://render.com)
+(the free plan asks for a card to verify you). Any host that runs Python works.
 
-## 1. Create the service on Render
+## Option A: Vercel (free, no card)
+
+Vercel runs `api/webhook.py` on each request, so there is no server to keep
+awake. `vercel.json` sends `/webhook` there.
+
+1. Sign up at vercel.com with **Continue with GitHub** and pick the free **Hobby** plan.
+2. **Add New > Project**, import the Tax-Engine repository. Framework preset: **Other**.
+   Leave the build settings empty.
+3. Open **Environment Variables** and add:
+   - `STRIPE_SECRET_KEY`: your `sk_test_...` key
+   - `STRIPE_WEBHOOK_SECRET`: `whsec_later` for now
+   - `TAXENGINE_COLLECT_IN`: `WA`
+4. Click **Deploy**. Vercel shows the address, for example `https://tax-engine-abc.vercel.app`.
+   Open it in a browser: it should say `tax engine webhook: ok`.
+5. Do step 2 below with the URL `https://<your-vercel-address>/webhook`.
+6. Put the real signing secret in **Settings > Environment Variables** in Vercel, then
+   **Deployments > ... > Redeploy**. Vercel only picks up a changed variable on a new deploy.
+
+Vercel's Hobby plan is for personal, non-commercial use. Before you bill real
+customers, move to a paid plan (Vercel Pro, or Render's always-on plan below).
+
+If the address says `not configured`, a variable is missing or misspelled.
+Vercel's **Logs** tab shows what the webhook printed for each event.
+
+## Option B: Render
+
+### 1. Create the service on Render
 
 1. Sign up at render.com with your GitHub account. Allow it to see the Tax-Engine repository.
 2. Choose **New > Blueprint** and pick the Tax-Engine repository. Render reads `render.yaml`.
