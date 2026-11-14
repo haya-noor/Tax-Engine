@@ -1,7 +1,7 @@
 """Vercel entry point for the Stripe webhook (see docs/hosting.md).
 
 Vercel runs this file on each request instead of a long-running server, using
-the same request handler as stripe_webhook.py. Settings come from the project's
+the same request handler as stripe_tax_webhook.py. Settings come from the project's
 environment variables: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
 TAXENGINE_COLLECT_IN (and optionally TAXENGINE_DOR_LOOKUP=0).
 """
@@ -13,7 +13,7 @@ from http.server import BaseHTTPRequestHandler
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from stripe_webhook import from_env, make_handler  # noqa: E402
+from stripe_tax_webhook import from_env, make_handler  # noqa: E402
 
 logging.basicConfig(format="note: %(message)s")
 

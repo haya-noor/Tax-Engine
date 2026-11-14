@@ -1,4 +1,4 @@
-"""Step 1: the core of the tax engine.
+"""The tax calculator: rate lookup by ZIP code and the tax for an amount.
 
 Given a US ZIP code and an amount, return the state, county, city and
 special-district rates, the combined rate, and the tax.
@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 
-from .taxability import DEFAULT_TAXABILITY_DIR, load_taxability
+from .product_taxability import DEFAULT_TAXABILITY_DIR, load_taxability
 
 CENT = Decimal("0.01")
 
@@ -161,10 +161,10 @@ class TaxEngine:
 
     collect_in: the states the seller is registered in, e.g. {"WA"}. Addresses in
     any other state get 0 tax. None means every state in the rate tables.
-    taxability_dir: the per-state product category rules (see taxability.py).
+    taxability_dir: the per-state product category rules (see product_taxability.py).
     resolvers: optional {state: resolver} for rates by street address. A resolver
     has resolve(Address) -> RateRow or None; None falls back to the ZIP5 tables.
-    See wa_dor.WashingtonResolver.
+    See washington_address_rates.WashingtonResolver.
     """
 
     def __init__(self, rates_dir=DEFAULT_RATES_DIR, collect_in=None, taxability_dir=DEFAULT_TAXABILITY_DIR,

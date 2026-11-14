@@ -4,7 +4,7 @@ import unittest
 from decimal import Decimal
 from pathlib import Path
 
-from adapters.stripe_invoices import NoTaxAddressError, add_tax_to_invoice, handle_event, tax_amounts_for
+from adapters.stripe_invoice_tax import NoTaxAddressError, add_tax_to_invoice, handle_event, tax_amounts_for
 from taxengine import TaxEngine
 
 FIXTURES = Path(__file__).parent / "fixtures" / "rates"

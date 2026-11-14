@@ -10,7 +10,7 @@ Try it locally with the Stripe CLI (test mode):
     stripe listen --api-key $env:STRIPE_SECRET_KEY --events invoice.created,invoice.updated,invoiceitem.created,invoiceitem.deleted --forward-to localhost:4242/webhook
     (it prints a whsec_... secret)
     $env:STRIPE_WEBHOOK_SECRET = "whsec_..."
-    python stripe_webhook.py
+    python stripe_tax_webhook.py
 
 It also listens for "invoice.updated", "invoiceitem.created" and
 "invoiceitem.deleted", so an invoice you build by hand in the Dashboard gets its
@@ -19,9 +19,9 @@ tax recalculated each time you add, change or remove an item. (Stripe has no
 press Send, the tax is on it. (Give it a second or two after the last item.)
 
 To run it for real, without your computer, host it: on Vercel through
-api/webhook.py (see docs/hosting.md), or anywhere that runs Python with
+api/vercel_handler.py (see docs/hosting.md), or anywhere that runs Python with
 HOST=0.0.0.0 and PORT set. Then add its https://.../webhook URL in the Stripe
-Dashboard under Developers > Webhooks, with the events in EVENTS (adapters/stripe_invoices.py).
+Dashboard under Developers > Webhooks, with the events in EVENTS (adapters/stripe_invoice_tax.py).
 """
 
 import logging
@@ -31,12 +31,12 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import stripe
 
-from adapters.stripe_invoices import EVENTS, handle_event
+from adapters.stripe_invoice_tax import EVENTS, handle_event
 from taxengine import TaxEngine, WashingtonResolver
 
 PORT = int(os.environ.get("PORT", "4242"))
 HOST = os.environ.get("HOST", "localhost")    # 0.0.0.0 when hosted
-WEBHOOK_PATHS = ("/webhook", "/api/webhook")   # /api/webhook is how Vercel routes it
+WEBHOOK_PATHS = ("/webhook", "/api/vercel_handler")   # /api/vercel_handler is how Vercel routes it
 
 
 def make_handler(client, engine, webhook_secret):

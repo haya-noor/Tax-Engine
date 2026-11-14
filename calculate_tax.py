@@ -1,10 +1,10 @@
-"""Try the core engine from the command line.
+"""Work out the sales tax for a ZIP code or address from the command line.
 
-    python try_it.py 10001 100
-    python try_it.py 88240 59.99 --state TX
-    python try_it.py 60601 100 --state IL --collect-in IL
-    python try_it.py 98101 4.50 --state WA --category groceries
-    python try_it.py 98004 100 --state WA --street "450 110th Ave NE" --city Bellevue
+    python calculate_tax.py 10001 100
+    python calculate_tax.py 88240 59.99 --state TX
+    python calculate_tax.py 60601 100 --state IL --collect-in IL
+    python calculate_tax.py 98101 4.50 --state WA --category groceries
+    python calculate_tax.py 98004 100 --state WA --street "450 110th Ave NE" --city Bellevue
 """
 
 import argparse

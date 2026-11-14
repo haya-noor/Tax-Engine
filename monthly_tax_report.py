@@ -1,8 +1,8 @@
 """Monthly sales tax report from your Stripe invoices, per location code.
 
     $env:STRIPE_SECRET_KEY = "sk_test_..."
-    python tax_report.py 2026-11                 # prints the table
-    python tax_report.py 2026-11 --csv nov.csv   # also saves a CSV
+    python monthly_tax_report.py 2026-11                 # prints the table
+    python monthly_tax_report.py 2026-11 --csv nov.csv   # also saves a CSV
 
 It adds up the invoices finalized in that month that this engine taxed: gross
 and taxable sales, state tax and local tax, per Washington location code. These
@@ -15,7 +15,7 @@ import sys
 
 import stripe
 
-from adapters.stripe_report import build_report, fetch_invoices, format_report, write_csv
+from adapters.stripe_monthly_report import build_report, fetch_invoices, format_report, write_csv
 
 
 def main():

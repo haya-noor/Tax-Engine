@@ -1,7 +1,7 @@
 """Monthly sales tax report from Stripe invoices.
 
 Every invoice the engine taxes carries a small record in its metadata (see
-record_for() in stripe_invoices.py): the state, the DOR location code, the gross
+record_for() in stripe_invoice_tax.py): the state, the DOR location code, the gross
 and taxable amounts, and the state and local tax. This module adds those up for
 one month, per location, which is what Washington's excise tax return asks for:
 the state part on the total, and the local part per location code.
@@ -15,7 +15,7 @@ import csv
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from .stripe_invoices import RECORD_PREFIX, plain
+from .stripe_invoice_tax import RECORD_PREFIX, plain
 
 REPORTED = {"open", "paid", "uncollectible"}     # finalized; "void" and "draft" are not sales
 

@@ -40,4 +40,4 @@ Download them each quarter from
 https://dor.wa.gov/taxes-rates/sales-use-tax-rates/downloadable-database
 
 Without these files, Washington rates still come by street address from DOR's
-lookup service when it is turned on. See `taxengine/wa_dor.py`.
+lookup service when it is turned on. See `taxengine/washington_address_rates.py`.

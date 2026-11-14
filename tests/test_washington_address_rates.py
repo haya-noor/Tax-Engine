@@ -1,13 +1,13 @@
-"""Washington rates by street address (taxengine.wa_dor). No network: the DOR lookup is faked."""
+"""Washington rates by street address (taxengine.washington_address_rates). No network: the DOR lookup is faked."""
 
 import unittest
 from decimal import Decimal
 from pathlib import Path
 
-from adapters.stripe_invoices import add_tax_to_invoice
+from adapters.stripe_invoice_tax import add_tax_to_invoice
 from taxengine import Address, CartLine, TaxEngine, WashingtonResolver, calculate_cart
-from taxengine.wa_dor import DorAddressLookup, Zip4Table, load_location_rates
-from tests.test_stripe_adapter import FakeStripe, chicago_invoice
+from taxengine.washington_address_rates import DorAddressLookup, Zip4Table, load_location_rates
+from tests.test_stripe_invoice_tax import FakeStripe, chicago_invoice
 
 HERE = Path(__file__).parent
 RATES = HERE / "fixtures" / "rates"
@@ -44,13 +44,13 @@ class DorLookupTest(unittest.TestCase):
 
     def test_zip_only_match_is_not_trusted(self):
         lookup = DorAddressLookup(fake_dor({"450 110th Ave NE": "LocationCode=1726 Rate=0.1055 ResultCode=5"}))
-        with self.assertLogs("taxengine.wa_dor", "WARNING"):
+        with self.assertLogs("taxengine.washington_address_rates", "WARNING"):
             self.assertIsNone(lookup.find(BELLEVUE))
 
     def test_network_error_falls_through(self):
         def broken(url, timeout):
             raise OSError("no network")
-        with self.assertLogs("taxengine.wa_dor", "WARNING"):
+        with self.assertLogs("taxengine.washington_address_rates", "WARNING"):
             self.assertIsNone(DorAddressLookup(broken).find(BELLEVUE))
 
 
@@ -111,7 +111,7 @@ class EngineWithAddressTest(unittest.TestCase):
 
     def test_unplaced_address_falls_back_to_zip5(self):
         engine = self.engine(files=False)
-        with self.assertLogs("taxengine.wa_dor", "WARNING"):
+        with self.assertLogs("taxengine.washington_address_rates", "WARNING"):
             result = engine.calculate("98004", "100", "WA", address=BELLEVUE)
         self.assertEqual((result.total_tax, result.source), (Decimal("10.55"), "zip5"))
 
