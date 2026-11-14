@@ -1,6 +1,6 @@
 """Check Washington results against official Department of Revenue figures.
 
-Sources are listed in data/validation/README.md.
+Sources are listed in tests/fixtures/validation/README.md.
 """
 
 import csv
@@ -10,7 +10,7 @@ from pathlib import Path
 
 from taxengine import DEFAULT_RATES_DIR, TaxEngine, money
 
-VALIDATION = Path(__file__).resolve().parent.parent / "data" / "validation"
+VALIDATION = Path(__file__).resolve().parent / "fixtures" / "validation"
 HAVE_WA = any(DEFAULT_RATES_DIR.glob("TAXRATES_ZIP5_WA*.csv"))
 
 # Rows copied from DOR's Retail Sales Tax Collection Schedules:

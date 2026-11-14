@@ -100,30 +100,24 @@ each line's amount after discounts. Each invoice item's product category comes
 from its metadata, e.g. `tax_category=groceries`; items with
 `tax_category=shipping` are delivery charges.
 
-    pip install -r requirements-stripe.txt
-    $env:STRIPE_SECRET_KEY = "sk_test_..."     # PowerShell; Stripe Dashboard > Developers > API keys, test mode
-    python stripe_demo.py                                # Seattle: T-shirt, bread, ebook, shipping
-    python stripe_demo.py --item "Hoodie=59.99:clothing" --item "Bread=4.50:groceries" --shipping 8.00
-
-The demo creates a customer, a draft invoice with the items, adds our tax,
-finalizes it, and prints links to the invoice. Only test keys are accepted.
-
-`stripe_webhook.py` does it automatically, the way a tax app does. Stripe tells
+`stripe_webhook.py` does this automatically, the way a tax app does. Stripe tells
 it whenever a draft invoice is created (for example a subscription renewal) or
 an item on a draft is added, changed or removed, and it recalculates that
 invoice's tax. So an invoice you build in the Dashboard already has its tax
 when you press Send. Tax only changes on drafts; sent invoices are left alone.
 
-Try it on your computer (in two PowerShell windows, both with STRIPE_SECRET_KEY set):
+Try it on your computer (in two PowerShell windows, both with STRIPE_SECRET_KEY
+set to a test key, `sk_test_...`):
 
+    pip install -r requirements.txt
     stripe listen --api-key $env:STRIPE_SECRET_KEY --events invoice.created,invoice.updated,invoiceitem.created,invoiceitem.deleted --forward-to localhost:4242/webhook
     # it prints a whsec_... secret
     $env:STRIPE_WEBHOOK_SECRET = "whsec_..."
     python stripe_webhook.py
 
-To run it all the time, host it: `render.yaml` sets it up on Render, and
+To run it all the time, host it on Vercel (`api/webhook.py`, `vercel.json`):
 [docs/hosting.md](docs/hosting.md) walks through it, including registering the
-webhook in the Stripe Dashboard. Any server that runs Python works (set
+webhook in the Stripe Dashboard. Any server that runs Python also works (set
 `HOST=0.0.0.0`, `PORT`, `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`).
 
 ### Monthly report
@@ -177,9 +171,8 @@ Washington's resolver uses the Department of Revenue (DOR) in this order:
 
 The result's `source` says which was used (`dor-zip4`, `dor-address` or `zip5`).
 A failed lookup logs a warning. `calculate_cart` takes the same `address=`, and
-the Stripe adapter passes the invoice's street address. The Stripe demo and
-webhook turn the DOR lookup on (`--no-dor-lookup` or `TAXENGINE_DOR_LOOKUP=0`
-turns it off).
+the Stripe adapter passes the invoice's street address. The webhook turns the
+DOR lookup on (`TAXENGINE_DOR_LOOKUP=0` turns it off).
 
 ## Quick start
 
@@ -190,19 +183,18 @@ turns it off).
     python try_it.py 98004 100 --state WA --street "450 110th Ave NE" --city Bellevue
     python -m unittest -v
 
-No extra libraries are needed (Python 3.10+).
+The engine needs no extra libraries (Python 3.10+); the Stripe parts need
+`pip install -r requirements.txt`.
 
 ## Project layout
 
     taxengine/        the engine (no platform code): core.py, cart.py, taxability.py,
                       wa_dor.py (Washington rates by address)
     adapters/         connections to other systems (Stripe so far)
-    data/             rate tables, and product rules per state in data/taxability/
-                      official figures to check against in data/validation/
-                      optional Washington DOR files in data/wa-dor/
-    tests/            tests, with small sample rate files in tests/fixtures/
+    data/             rate tables, product rules per state (data/taxability/),
+                      Washington DOR files (data/wa-dor/); see data/README.md
+    tests/            tests, with small sample files in tests/fixtures/
     try_it.py         try it from the command line
-    stripe_demo.py    make a Stripe test invoice with our tax
-    stripe_webhook.py add our tax to new Stripe invoices automatically
+    stripe_webhook.py add our tax to Stripe invoices automatically
+    api/, vercel.json run the webhook on Vercel (see docs/hosting.md)
     tax_report.py     monthly tax report per location, from Stripe invoices
-    render.yaml       hosting setup for the webhook (see docs/hosting.md)
