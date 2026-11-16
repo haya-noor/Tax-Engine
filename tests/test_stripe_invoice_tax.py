@@ -162,6 +162,13 @@ class StripeCategoriesTest(unittest.TestCase):
         fake.product_data["prod_x"] = {"tax_code": "txcd_12345678"}
         self.assertEqual(add_tax_to_invoice(fake, self.engine, "in_1"), 106)   # 10.00 x 10.55%
 
+    def test_codes_sst_does_not_define(self):
+        fake = FakeStripe(self.seattle_invoice(), [])
+        for code, category in [("txcd_00000000", "nontaxable"), ("txcd_10103001", "software_as_a_service"),
+                               ("txcd_10304100", "digital_newspapers")]:
+            fake.product_data["prod_1"] = {"tax_code": code}
+            self.assertEqual(line_category(fake, self.product_line("prod_1")), category)
+
     def test_older_price_shape_and_expanded_tax_code(self):
         fake = FakeStripe(self.seattle_invoice(), [])
         fake.product_data["prod_1"] = {"tax_code": {"id": "txcd_30011000"}}

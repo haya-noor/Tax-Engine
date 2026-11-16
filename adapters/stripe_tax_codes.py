@@ -3,8 +3,7 @@
 A business may already have tax codes on its Stripe products. When a product has
 no "tax_category" metadata, its tax code decides the category. Codes not listed
 here fall back to "general" (taxed), so the engine never under-collects by guessing.
-Only codes that match an SST definition are listed; Stripe codes with no SST
-equivalent (SaaS, "Nontaxable", ...) are taxed as general.
+See docs/product-categories.md for how categories are chosen.
 
 Only codes checked against Stripe's list are here: https://docs.stripe.com/tax/tax-codes
 Food, candy, drinks and delivery codes still need checking before they are added;
@@ -15,6 +14,7 @@ from taxengine.shared.product_taxability import GENERAL
 
 STRIPE_TAX_CODES = {
     "txcd_99999999": GENERAL,                           # General - Tangible Goods
+    "txcd_00000000": "nontaxable",                      # Nontaxable
     "txcd_30011000": "clothing",                        # Clothing and Footwear
     "txcd_32020001": "prescription_drugs",              # Prescription Drugs
     "txcd_32020002": "over_the_counter_drugs",          # Drugs - Over the Counter
@@ -23,6 +23,13 @@ STRIPE_TAX_CODES = {
     "txcd_10402100": "digital_audio_visual_works",      # Digital Audio Visual Works
     "txcd_10202000": "prewritten_software_electronic",  # Downloadable Software - personal use
     "txcd_10202003": "prewritten_software_electronic",  # Downloadable Software - business use
+    "txcd_10103000": "software_as_a_service",           # SaaS - personal use
+    "txcd_10103001": "software_as_a_service",           # SaaS - business use
+    "txcd_10103100": "software_as_a_service",           # SaaS - electronic download - personal use
+    "txcd_10103101": "software_as_a_service",           # SaaS - electronic download - business use
+    **{code: "digital_newspapers" for code in (         # Digital Newspapers, every variant
+        "txcd_10304000", "txcd_10304001", "txcd_10304002", "txcd_10304003",
+        "txcd_10304100", "txcd_10304101", "txcd_10304102")},
 }
 
 

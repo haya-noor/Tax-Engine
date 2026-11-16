@@ -24,8 +24,9 @@ Everything specific to Washington. The shared engine is in `taxengine/shared/`.
 
 | Column | Meaning |
 |---|---|
-| `category` | the tag used on products, named after the SST definition, e.g. `food_and_food_ingredients` |
-| `sst_ref` | the SST Library of Definitions reference number (empty when SST has no definition) |
+| `category` | the tag used on products, e.g. `food_and_food_ingredients` |
+| `basis` | where the name is defined: `sst`, `stripe` (a Stripe tax code) or `state_law` |
+| `ref` | its id there: the SST number, the Stripe `txcd_` code, or the statute |
 | `taxable` | `yes` (full local rate), `no` (exempt), or for `delivery_charges` also `proportional` |
 | `description` | what the category covers, in plain words |
 | `source` | the official page or law the rule comes from |

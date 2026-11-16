@@ -70,29 +70,15 @@ goods by price are taxable, so 90% of the shipping is).
 ## Product categories
 
 Which products are taxed is set per state in `taxengine/states/<state>/taxability.csv`,
-one row per category, each with the official source it comes from. Category
-names follow the [Streamlined Sales Tax Library of Definitions](https://www.streamlinedsalestax.org/),
-and the `sst_ref` column holds the SST reference number, so the same category
-can be looked up in any SST state's taxability matrix. Products without a
-category are `general`. Washington's file covers:
+one row per category, each with the official source it comes from. Every
+category name is official: an SST definition first, a Stripe tax code for what
+SST doesn't define (e.g. SaaS), or the state's own law for what neither
+defines (e.g. printed newspapers in WA). Products without a category are
+`general` and taxed; unknown names are refused, never guessed.
 
-| Category | SST ref | Taxed in WA? |
-|---|---|---|
-| `general`, `clothing` | –, 20010 | yes |
-| `food_and_food_ingredients`, `candy` | 40030, 40010 | no |
-| `prepared_food`, `soft_drinks`, `bottled_water` | 41000, 40050, 40060 | yes |
-| `dietary_supplements`, `over_the_counter_drugs` | 40020, 51130 | yes |
-| `prescription_drugs` | 51020 | no |
-| `digital_products`, `digital_audio_visual_works`, `digital_audio_works`, `digital_books` | 31000, 31040, 31070, 31100 | yes |
-| `prewritten_software`, `prewritten_software_electronic` | 30040, 30050 | yes |
-| `delivery_charges` | 11010 | in proportion to taxed goods |
-
-Only official SST definitions are used, plus `general` for products no SST
-definition covers (it is taxed). Any other name, e.g. `groceries`, is refused.
-
-An unknown category is an error, never a guess. States without a file tax
-`general` products and delivery charges only. See `taxengine/states/washington/README.md`. These
-rules should be checked by the client or a tax adviser before going live.
+The full list, how a product's category is found (metadata, then the Stripe
+tax code) and how to add a state are in
+[docs/product-categories.md](docs/product-categories.md).
 
 ## Adapters
 

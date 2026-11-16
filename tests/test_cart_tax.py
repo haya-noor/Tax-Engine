@@ -3,6 +3,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from taxengine import CartLine, TaxEngine, UnknownCategoryError, calculate_cart, load_taxability, taxability_files
+from adapters.stripe_tax_codes import STRIPE_TAX_CODES
 from taxengine.shared.product_taxability import rule_for
 
 FIXTURES = Path(__file__).parent / "fixtures" / "rates"
@@ -71,17 +72,28 @@ class WashingtonRuleFileTest(unittest.TestCase):
         self.assertEqual(rules["delivery_charges"].taxable, "proportional")
         self.assertEqual(rules["food_and_food_ingredients"].taxable, "no")
         self.assertEqual(rules["candy"].taxable, "no")
-        self.assertEqual(rules["candy"].sst_ref, "40010")
+        self.assertEqual((rules["candy"].basis, rules["candy"].ref), ("sst", "40010"))
         for rule in rules.values():
             self.assertTrue(rule.source.startswith("https://"), rule.category)
 
-    def test_only_sst_categories_besides_general(self):
+    def test_every_category_comes_from_an_official_source(self):
         rules = load_taxability(taxability_files())
         for name, rule in rules["WA"].items():
-            self.assertTrue(name == "general" or rule.sst_ref, f"{name} is not an SST definition")
+            if rule.basis == "sst":
+                self.assertTrue(rule.ref.isdigit(), name)
+            elif rule.basis == "stripe":
+                self.assertRegex(rule.ref, r"^txcd_\d{8}$", name)
+            else:
+                self.assertEqual(rule.basis, "state_law", name)
+                self.assertTrue(rule.ref.startswith("RCW "), name)
         with self.assertRaises(UnknownCategoryError):
             rule_for(rules, "WA", "groceries")     # unofficial names are refused, not guessed
         self.assertEqual(rule_for(rules, "WA", " Candy ").category, "candy")
+
+    def test_every_mapped_stripe_code_has_a_washington_rule(self):
+        rules = load_taxability(taxability_files())["WA"]
+        for code, category in STRIPE_TAX_CODES.items():
+            self.assertIn(category, rules, code)
 
 if __name__ == "__main__":
     unittest.main()
