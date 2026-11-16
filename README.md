@@ -8,8 +8,10 @@ sales tax for each line, broken down by state, county, city and special district
 - Looks up the tax rates for an address by ZIP code (state, county, city, special district).
 - Taxes only the states you collect in; every other state gets 0 tax.
 - Taxes a whole cart: line items, quantities, discounts and shipping.
-- Applies each state's product rules by category (e.g. in Washington groceries
-  are exempt and clothing is taxed). Washington is the first state with rules.
+- Applies each state's product rules by category (e.g. in Washington food
+  is exempt and clothing is taxed). Categories use the Streamlined Sales Tax
+  (SST) definitions, so they mean the same in every state. Washington is the
+  first state with rules.
 - Rounds money to the cent, half up, per line, using exact decimals (never floats).
 - Records which rate table version was used, so every result can be traced.
 
@@ -54,7 +56,7 @@ from taxengine import CartLine, TaxEngine, calculate_cart
 engine = TaxEngine(collect_in={"WA"})
 cart = calculate_cart(engine, "98101", "WA", [
     CartLine("shirt", "25.00", quantity=2, discount="5.00", category="clothing"),
-    CartLine("bread", "5.00", category="groceries"),
+    CartLine("bread", "5.00", category="food_and_food_ingredients"),
 ], shipping="8.00")
 
 cart.total_tax   # Decimal("5.51"): shirt 4.75 + bread 0 + shipping 0.76
@@ -68,22 +70,15 @@ goods by price are taxable, so 90% of the shipping is).
 ## Product categories
 
 Which products are taxed is set per state in `taxengine/states/<state>/taxability.csv`,
-one row per category, each with the official source it comes from. Products
-without a category are `general`. Washington's file covers:
+one row per category, each with the official source it comes from. Every
+category name is official: an SST definition first, a Stripe tax code for what
+SST doesn't define (e.g. SaaS), or the state's own law for what neither
+defines (e.g. printed newspapers in WA). Products without a category are
+`general` and taxed; unknown names are refused, never guessed.
 
-| Category | Taxed in WA? |
-|---|---|
-| `general`, `clothing` | yes |
-| `groceries` (incl. candy) | no |
-| `prepared_food`, `soft_drinks`, `bottled_water` | yes |
-| `dietary_supplements`, `otc_drugs` (no prescription) | yes |
-| `prescription_drugs`, `newspapers` | no |
-| `digital_goods`, `software` (incl. SaaS) | yes |
-| `shipping` | in proportion to taxed goods |
-
-An unknown category is an error, never a guess. States without a file tax
-`general` products and shipping only. See `taxengine/states/washington/README.md`. These
-rules should be checked by the client or a tax adviser before going live.
+The full list, how a product's category is found (metadata, then the Stripe
+tax code) and how to add a state are in
+[docs/product-categories.md](docs/product-categories.md).
 
 ## Adapters
 
@@ -96,9 +91,12 @@ Adapters live in `adapters/` and only translate; the tax logic stays in
 one tax line per layer, using Stripe's
 [manual tax amounts](https://docs.stripe.com/invoicing/taxes/manual-tax-amounts).
 It taxes the shipping address, or the billing address if there is none, on
-each line's amount after discounts. Each invoice item's product category comes
-from its metadata, e.g. `tax_category=groceries`; items with
-`tax_category=shipping` are delivery charges.
+each line's amount after discounts. Each line's product category comes from
+`tax_category` metadata (on the line, its invoice item or its product), e.g.
+`tax_category=food_and_food_ingredients`. If there is none, the product's Stripe
+tax code is used (`txcd_30011000` Clothing becomes `clothing`; the list is in
+`adapters/stripe_tax_codes.py`), and anything else is `general`. Lines with
+`tax_category=delivery_charges` are delivery charges.
 
 `stripe_tax_webhook.py` does this automatically, the way a tax app does. Stripe tells
 it whenever a draft invoice is created (for example a subscription renewal) or
@@ -178,7 +176,7 @@ DOR lookup on (`TAXENGINE_DOR_LOOKUP=0` turns it off).
     python calculate_tax.py 60601 100 --state IL
     python calculate_tax.py 88240 59.99 --state TX
     python calculate_tax.py 60601 100 --state IL --collect-in IL
-    python calculate_tax.py 98101 4.50 --state WA --category groceries
+    python calculate_tax.py 98101 4.50 --state WA --category food_and_food_ingredients
     python calculate_tax.py 98004 100 --state WA --street "450 110th Ave NE" --city Bellevue
     python -m unittest -v
 

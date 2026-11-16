@@ -24,18 +24,22 @@ Everything specific to Washington. The shared engine is in `taxengine/shared/`.
 
 | Column | Meaning |
 |---|---|
-| `category` | the tag used on products, e.g. `groceries` |
-| `taxable` | `yes` (full local rate), `no` (exempt), or for `shipping` also `proportional` |
+| `category` | the tag used on products, e.g. `food_and_food_ingredients` |
+| `basis` | where the name is defined: `sst`, `stripe` (a Stripe tax code) or `state_law` |
+| `ref` | its id there: the SST number, the Stripe `txcd_` code, or the statute |
+| `taxable` | `yes` (full local rate), `no` (exempt), or for `delivery_charges` also `proportional` |
 | `description` | what the category covers, in plain words |
 | `source` | the official page or law the rule comes from |
 
-The `shipping` row says how delivery charges are taxed. `proportional` means
-in the same share as the goods delivered, by price: a box with only groceries
+The `delivery_charges` row says how shipping is taxed. `proportional` means
+in the same share as the goods delivered, by price: a box with only food
 ships tax-free, a box that is half clothing by price has half its shipping taxed.
 
+Washington is an SST member, so its official answers for each SST category are
+in its SST taxability matrix (https://dor.wa.gov/sites/default/files/2022-02/WATaxabilityMatrix.pdf).
 These rules were researched from official sources in November 2026 and should
 be checked by the client or a tax adviser before going live. States with no
-`taxability.csv` tax `general` products and shipping in full; any other category raises an error so
+`taxability.csv` tax `general` products and delivery charges in full; any other category raises an error so
 nothing is taxed or exempted by guesswork.
 
 ## DOR files: `dor-files/`
