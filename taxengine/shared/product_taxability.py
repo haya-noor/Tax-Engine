@@ -3,6 +3,11 @@
 Each state keeps its rules in its own folder, taxengine/states/<state>/taxability.csv,
 one row per category, each with the official source it came from. This module
 only reads them; it knows nothing about any one state.
+
+Category names follow the Streamlined Sales Tax (SST) Library of Definitions,
+so a category means the same thing in every state; the sst_ref column holds
+the SST reference number. Older names (groceries, shipping, ...) still work
+through ALIASES.
 """
 
 import csv
@@ -10,7 +15,25 @@ from dataclasses import dataclass
 from pathlib import Path
 
 GENERAL = "general"
-SHIPPING = "shipping"
+NONTAXABLE = "nontaxable"
+SHIPPING = "delivery_charges"
+
+# Names used before the switch to SST definitions, so existing product metadata keeps working.
+ALIASES = {
+    "groceries": "food_and_food_ingredients",
+    "food": "food_and_food_ingredients",
+    "shipping": SHIPPING,
+    "otc_drugs": "over_the_counter_drugs",
+    "digital_goods": "digital_products",
+    "software": "prewritten_software",
+    "saas": "remote_access_software",
+}
+
+
+def canonical_category(category):
+    """'Groceries ' -> 'food_and_food_ingredients'; empty -> 'general'."""
+    category = (category or GENERAL).strip().lower()
+    return ALIASES.get(category, category)
 
 
 class UnknownCategoryError(LookupError):
@@ -20,15 +43,17 @@ class UnknownCategoryError(LookupError):
 @dataclass(frozen=True)
 class Rule:
     category: str
-    taxable: str        # "yes", "no", or for shipping "proportional"
+    taxable: str        # "yes", "no", or for delivery charges "proportional"
     description: str
     source: str
+    sst_ref: str = ""   # SST Library of Definitions reference number, if SST defines the category
 
 
-# States without a file: general goods and shipping are taxed in full.
+# States without a file: general goods and delivery charges are taxed in full.
 DEFAULT_RULES = {
     GENERAL: Rule(GENERAL, "yes", "Physical goods", ""),
-    SHIPPING: Rule(SHIPPING, "yes", "Delivery charges", ""),
+    NONTAXABLE: Rule(NONTAXABLE, "no", "Marked as not subject to sales tax", ""),
+    SHIPPING: Rule(SHIPPING, "yes", "Delivery charges", "", "11010"),
 }
 
 
@@ -43,7 +68,8 @@ def load_taxability(files):
                 taxable = rec["taxable"].strip().lower()
                 if taxable not in ("yes", "no", "proportional"):
                     raise ValueError(f"{path}: taxable must be yes, no or proportional, not {taxable!r}")
-                rule = Rule(rec["category"].strip(), taxable, rec["description"], rec["source"])
+                rule = Rule(rec["category"].strip(), taxable, rec["description"], rec["source"],
+                            (rec.get("sst_ref") or "").strip())
                 state_rules[rule.category] = rule
         rules[state.upper()] = state_rules
     return rules
@@ -51,7 +77,7 @@ def load_taxability(files):
 
 def rule_for(rules, state, category):
     state_rules = rules.get(state.upper(), DEFAULT_RULES)
-    category = (category or GENERAL).strip().lower()
+    category = canonical_category(category)
     if category not in state_rules:
         known = ", ".join(sorted(state_rules))
         raise UnknownCategoryError(f"No {state.upper()} rule for category {category!r}; known: {known}")

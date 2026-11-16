@@ -3,7 +3,7 @@
     python calculate_tax.py 10001 100
     python calculate_tax.py 88240 59.99 --state TX
     python calculate_tax.py 60601 100 --state IL --collect-in IL
-    python calculate_tax.py 98101 4.50 --state WA --category groceries
+    python calculate_tax.py 98101 4.50 --state WA --category food_and_food_ingredients
     python calculate_tax.py 98004 100 --state WA --street "450 110th Ave NE" --city Bellevue
 """
 
@@ -19,7 +19,7 @@ def main():
     parser.add_argument("zip_code")
     parser.add_argument("amount")
     parser.add_argument("--state", help="the address's state; needed for ZIPs that cross a state line")
-    parser.add_argument("--category", help="product category, e.g. clothing or groceries (needs --state); "
+    parser.add_argument("--category", help="product category, e.g. clothing or food_and_food_ingredients (needs --state); "
                                            "see taxengine/states/<state>/taxability.csv")
     parser.add_argument("--street", help="street address (needs --state); in WA the rate then comes from "
                                          "the Department of Revenue by address instead of the ZIP alone")

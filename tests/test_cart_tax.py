@@ -3,6 +3,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from taxengine import CartLine, TaxEngine, UnknownCategoryError, calculate_cart, load_taxability, taxability_files
+from taxengine.shared.product_taxability import ALIASES, canonical_category, rule_for
 
 FIXTURES = Path(__file__).parent / "fixtures" / "rates"
 D = Decimal
@@ -67,10 +68,20 @@ class WashingtonRuleFileTest(unittest.TestCase):
     def test_every_rule_is_valid_and_cites_a_source(self):
         rules = load_taxability(taxability_files())["WA"]
         self.assertIn("general", rules)
-        self.assertEqual(rules["shipping"].taxable, "proportional")
-        self.assertEqual(rules["groceries"].taxable, "no")
+        self.assertEqual(rules["delivery_charges"].taxable, "proportional")
+        self.assertEqual(rules["food_and_food_ingredients"].taxable, "no")
+        self.assertEqual(rules["candy"].taxable, "no")
+        self.assertEqual(rules["candy"].sst_ref, "40010")
         for rule in rules.values():
             self.assertTrue(rule.source.startswith("https://"), rule.category)
+            self.assertTrue(rule.sst_ref == "" or rule.sst_ref.isdigit(), rule.category)
+
+    def test_older_category_names_still_work(self):
+        rules = load_taxability(taxability_files())
+        for old, new in ALIASES.items():
+            self.assertEqual(rule_for(rules, "WA", old).category, new)
+        self.assertEqual(canonical_category(" Groceries "), "food_and_food_ingredients")
+        self.assertEqual(canonical_category(""), "general")
 
 
 if __name__ == "__main__":

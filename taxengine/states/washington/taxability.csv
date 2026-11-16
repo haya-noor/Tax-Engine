@@ -1,14 +1,21 @@
-category,taxable,description,source
-general,yes,"Physical goods with no exemption (the default category)",https://dor.wa.gov/taxes-rates/retail-sales-tax
-clothing,yes,"Clothing and shoes; Washington has no clothing exemption",https://dor.wa.gov/taxes-rates/retail-sales-tax/retail-sales-and-use-tax-exemptions
-groceries,no,"Food and food ingredients, including candy and gum (RCW 82.08.0293)",https://app.leg.wa.gov/RCW/default.aspx?cite=82.08.0293
-prepared_food,yes,"Food heated or mixed by the seller, or sold with utensils (excluded from the food exemption)",https://app.leg.wa.gov/RCW/default.aspx?cite=82.08.0293
-soft_drinks,yes,"Sweetened non-alcoholic drinks; not drinks with milk or over 50% juice (excluded from the food exemption)",https://app.leg.wa.gov/RCW/default.aspx?cite=82.08.0293
-bottled_water,yes,"Bottled water (excluded from the food exemption)",https://app.leg.wa.gov/RCW/default.aspx?cite=82.08.0293
-dietary_supplements,yes,"Vitamins and supplements sold without a prescription",https://dor.wa.gov/sites/default/files/2022-02/PharmacySalesChart.pdf
-prescription_drugs,no,"Drugs dispensed under a prescription (RCW 82.08.0281)",https://app.leg.wa.gov/RCW/default.aspx?cite=82.08.0281
-otc_drugs,yes,"Over-the-counter medicine sold without a prescription",https://dor.wa.gov/sites/default/files/2022-02/PharmacySalesChart.pdf
-newspapers,no,"Newspapers (RCW 82.08.0253)",https://app.leg.wa.gov/RCW/default.aspx?cite=82.08.0253
-digital_goods,yes,"Downloaded or streamed music, movies, books and similar",https://dor.wa.gov/forms-publications/publications-subject/tax-topics/digital-products-including-digital-goods
-software,yes,"Prewritten software, downloaded or used online (remote access software / SaaS)",https://dor.wa.gov/forms-publications/publications-subject/tax-topics/digital-products-including-digital-goods
-shipping,proportional,"Delivery charges are taxed in the same share as the goods delivered (by price)",https://dor.wa.gov/forms-publications/publications-subject/tax-topics/delivery-charges
+category,sst_ref,taxable,description,source
+general,,yes,"Physical goods with no exemption (the default category)",https://dor.wa.gov/taxes-rates/retail-sales-tax
+nontaxable,,no,"Items the seller has marked as not subject to sales tax",https://dor.wa.gov/taxes-rates/retail-sales-tax
+clothing,20010,yes,"Clothing and shoes; Washington has no clothing exemption",https://dor.wa.gov/taxes-rates/retail-sales-tax/retail-sales-and-use-tax-exemptions
+food_and_food_ingredients,40030,no,"Food and food ingredients for home consumption (RCW 82.08.0293)",https://app.leg.wa.gov/RCW/default.aspx?cite=82.08.0293
+candy,40010,no,"Candy and gum; Washington exempts candy with other food (RCW 82.08.0293)",https://app.leg.wa.gov/RCW/default.aspx?cite=82.08.0293
+prepared_food,41000,yes,"Food heated or mixed by the seller, or sold with utensils (excluded from the food exemption)",https://app.leg.wa.gov/RCW/default.aspx?cite=82.08.0293
+soft_drinks,40050,yes,"Sweetened non-alcoholic drinks; not drinks with milk or over 50% juice (excluded from the food exemption)",https://app.leg.wa.gov/RCW/default.aspx?cite=82.08.0293
+bottled_water,40060,yes,"Bottled water (excluded from the food exemption)",https://app.leg.wa.gov/RCW/default.aspx?cite=82.08.0293
+dietary_supplements,40020,yes,"Vitamins and supplements sold without a prescription (excluded from the food exemption)",https://dor.wa.gov/sites/default/files/2022-02/PharmacySalesChart.pdf
+prescription_drugs,51020,no,"Drugs dispensed under a prescription (RCW 82.08.0281)",https://app.leg.wa.gov/RCW/default.aspx?cite=82.08.0281
+over_the_counter_drugs,51130,yes,"Medicine sold without a prescription",https://dor.wa.gov/sites/default/files/2022-02/PharmacySalesChart.pdf
+newspapers,,no,"Newspapers (RCW 82.08.0253); SST has no uniform definition, each state sets its own",https://app.leg.wa.gov/RCW/default.aspx?cite=82.08.0253
+digital_products,31000,yes,"Digital goods in general: downloaded or streamed music, movies, books and similar",https://dor.wa.gov/forms-publications/publications-subject/tax-topics/digital-products-including-digital-goods
+digital_audio_visual_works,31040,yes,"Movies, shows and other video, downloaded or streamed",https://dor.wa.gov/forms-publications/publications-subject/tax-topics/digital-products-including-digital-goods
+digital_audio_works,31070,yes,"Songs, audiobooks and other audio, downloaded or streamed",https://dor.wa.gov/forms-publications/publications-subject/tax-topics/digital-products-including-digital-goods
+digital_books,31100,yes,"E-books",https://dor.wa.gov/forms-publications/publications-subject/tax-topics/digital-products-including-digital-goods
+prewritten_software,30040,yes,"Prewritten (off-the-shelf) software on a physical medium",https://dor.wa.gov/forms-publications/publications-subject/tax-topics/digital-products-including-digital-goods
+prewritten_software_electronic,30050,yes,"Prewritten software delivered electronically (downloaded)",https://dor.wa.gov/forms-publications/publications-subject/tax-topics/digital-products-including-digital-goods
+remote_access_software,,yes,"Software used online without downloading it (SaaS); Washington taxes it as prewritten software",https://dor.wa.gov/forms-publications/publications-subject/tax-topics/digital-products-including-digital-goods
+delivery_charges,11010,proportional,"Delivery charges are taxed in the same share as the goods delivered (by price)",https://dor.wa.gov/forms-publications/publications-subject/tax-topics/delivery-charges

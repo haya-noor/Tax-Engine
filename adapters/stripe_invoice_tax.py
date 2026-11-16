@@ -13,7 +13,9 @@ import re
 from decimal import Decimal
 
 from taxengine import Address, CartLine, calculate_cart, money
-from taxengine.shared.product_taxability import GENERAL, SHIPPING
+from taxengine.shared.product_taxability import SHIPPING, canonical_category
+
+from .stripe_tax_codes import category_for_tax_code
 
 CATEGORY_KEY = "tax_category"
 RECORD_PREFIX = "tax_engine_"    # invoice metadata keys written by record_for(); read by the monthly report
@@ -87,25 +89,41 @@ def tax_amounts_for(result):
     return amounts
 
 
-def line_category(client, line):
-    """The product category from metadata, e.g. {"tax_category": "groceries"}.
+def line_product_id(line):
+    """The product behind an invoice line, from the current or the older API shape."""
+    details = (line.get("pricing") or {}).get("price_details") or {}
+    product = details.get("product") or (line.get("price") or {}).get("product")
+    return product.get("id") if isinstance(product, dict) else product
 
-    Read from the line, or else from the invoice item it came from.
+
+def line_category(client, line):
+    """The line's SST product category, e.g. "food_and_food_ingredients".
+
+    In order: "tax_category" metadata on the line, on the invoice item it came from,
+    or on its product; else the product's Stripe tax code (txcd_...); else "general".
+    Older names such as "groceries" are accepted and turned into the SST name.
     """
     metadata = line.get("metadata") or {}
     if CATEGORY_KEY not in metadata:
         item_id = ((line.get("parent") or {}).get("invoice_item_details") or {}).get("invoice_item")
         if item_id:
             metadata = plain(client.v1.invoice_items.retrieve(item_id)).get("metadata") or {}
-    return metadata.get(CATEGORY_KEY) or GENERAL
+    if metadata.get(CATEGORY_KEY):
+        return canonical_category(metadata[CATEGORY_KEY])
+    product_id = line_product_id(line)
+    if not product_id:
+        return canonical_category(None)
+    product = plain(client.v1.products.retrieve(product_id))
+    category = (product.get("metadata") or {}).get(CATEGORY_KEY)
+    return canonical_category(category or category_for_tax_code(product.get("tax_code")))
 
 
 def add_tax_to_invoice(client, engine, invoice_id, memo=None):
     """Calculate and set tax on every line of a draft invoice. Returns total tax in cents.
 
     client is a stripe.StripeClient; engine is a taxengine.TaxEngine. Each line's
-    product category comes from its "tax_category" metadata (default "general");
-    lines with category "shipping" are delivery charges.
+    product category comes from line_category(); lines in the "delivery_charges"
+    category (or the older name "shipping") are delivery charges.
     """
     invoice = plain(client.v1.invoices.retrieve(invoice_id))
     if invoice["status"] != "draft":

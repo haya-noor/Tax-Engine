@@ -4,7 +4,8 @@ import unittest
 from decimal import Decimal
 from pathlib import Path
 
-from adapters.stripe_invoice_tax import NoTaxAddressError, add_tax_to_invoice, handle_event, tax_amounts_for
+from adapters.stripe_invoice_tax import (NoTaxAddressError, add_tax_to_invoice, handle_event, line_category,
+                                        tax_amounts_for)
 from taxengine import TaxEngine
 
 FIXTURES = Path(__file__).parent / "fixtures" / "rates"
@@ -33,12 +34,16 @@ class FakeStripe:
     def __init__(self, invoice, lines):
         self.invoice, self.lines, self.updates, self.records = invoice, lines, {}, []
         self.invoice_item_metadata = {}
+        self.product_data = {}
         self.v1 = self
         self.invoices = self
         self.line_items = self
         self.invoice_items = self
+        self.products = self
 
     def retrieve(self, object_id):
+        if object_id.startswith("prod_"):
+            return StripeLike({"id": object_id, "metadata": {}, "tax_code": None, **self.product_data.get(object_id, {})})
         if object_id.startswith("ii_"):
             return StripeLike({"id": object_id, "metadata": self.invoice_item_metadata.get(object_id, {})})
         return StripeLike(self.invoice)
@@ -136,6 +141,32 @@ class StripeCategoriesTest(unittest.TestCase):
         fake = FakeStripe(self.seattle_invoice(), lines)
         fake.invoice_item_metadata["ii_1"] = {"tax_category": "groceries"}
         self.assertEqual(add_tax_to_invoice(fake, self.engine, "in_1"), 0)
+
+    def product_line(self, product_id, amount=1000):
+        return {"id": "il_1", "amount": amount, "metadata": {},
+                "pricing": {"price_details": {"product": product_id}}}
+
+    def test_category_from_the_product_tax_code(self):
+        fake = FakeStripe(self.seattle_invoice(), [self.product_line("prod_rx")])
+        fake.product_data["prod_rx"] = {"tax_code": "txcd_32020001"}         # Prescription Drugs
+        self.assertEqual(add_tax_to_invoice(fake, self.engine, "in_1"), 0)
+        self.assertEqual(line_category(fake, self.product_line("prod_rx")), "prescription_drugs")
+
+    def test_product_metadata_wins_over_its_tax_code(self):
+        fake = FakeStripe(self.seattle_invoice(), [])
+        fake.product_data["prod_1"] = {"tax_code": "txcd_99999999", "metadata": {"tax_category": "candy"}}
+        self.assertEqual(line_category(fake, self.product_line("prod_1")), "candy")
+
+    def test_unlisted_tax_code_is_taxed_as_general(self):
+        fake = FakeStripe(self.seattle_invoice(), [self.product_line("prod_x")])
+        fake.product_data["prod_x"] = {"tax_code": "txcd_12345678"}
+        self.assertEqual(add_tax_to_invoice(fake, self.engine, "in_1"), 106)   # 10.00 x 10.55%
+
+    def test_older_price_shape_and_expanded_tax_code(self):
+        fake = FakeStripe(self.seattle_invoice(), [])
+        fake.product_data["prod_1"] = {"tax_code": {"id": "txcd_30011000"}}
+        line = {"id": "il_1", "amount": 100, "metadata": {}, "price": {"product": "prod_1"}}
+        self.assertEqual(line_category(fake, line), "clothing")
 
 
 class WebhookEventTest(unittest.TestCase):
