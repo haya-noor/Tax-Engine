@@ -32,7 +32,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import stripe
 
 from adapters.stripe_invoice_tax import EVENTS, handle_event
-from taxengine import TaxEngine, WashingtonResolver
+from taxengine import TaxEngine, address_resolvers
 
 PORT = int(os.environ.get("PORT", "4242"))
 HOST = os.environ.get("HOST", "localhost")    # 0.0.0.0 when hosted
@@ -78,9 +78,10 @@ def from_env():
     if not key.startswith(("sk_test_", "rk_test_")) or not secret:
         raise ValueError("Set STRIPE_SECRET_KEY (a test key, sk_test_...) and STRIPE_WEBHOOK_SECRET (whsec_...).")
     collect_in = os.environ.get("TAXENGINE_COLLECT_IN")
-    # Washington rates by street address from DOR; set TAXENGINE_DOR_LOOKUP=0 to use ZIP5 only.
-    wa = WashingtonResolver.from_files(use_web_lookup=os.environ.get("TAXENGINE_DOR_LOOKUP", "1") != "0")
-    engine = TaxEngine(collect_in=collect_in.split(",") if collect_in else None, resolvers={"WA": wa})
+    # Rates by street address where a state has its own source (Washington: DOR).
+    # TAXENGINE_DOR_LOOKUP=0 turns the web lookups off and uses the files and ZIP tables only.
+    resolvers = address_resolvers(use_web_lookup=os.environ.get("TAXENGINE_DOR_LOOKUP", "1") != "0")
+    engine = TaxEngine(collect_in=collect_in.split(",") if collect_in else None, resolvers=resolvers)
     return stripe.StripeClient(key), engine, secret
 
 

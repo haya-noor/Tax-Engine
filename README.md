@@ -67,7 +67,7 @@ goods by price are taxable, so 90% of the shipping is).
 
 ## Product categories
 
-Which products are taxed is set per state in `data/taxability/<STATE>.csv`,
+Which products are taxed is set per state in `taxengine/states/<state>/taxability.csv`,
 one row per category, each with the official source it comes from. Products
 without a category are `general`. Washington's file covers:
 
@@ -82,7 +82,7 @@ without a category are `general`. Washington's file covers:
 | `shipping` | in proportion to taxed goods |
 
 An unknown category is an error, never a guess. States without a file tax
-`general` products and shipping only. See `data/taxability/README.md`. These
+`general` products and shipping only. See `taxengine/states/washington/README.md`. These
 rules should be checked by the client or a tax adviser before going live.
 
 ## Adapters
@@ -155,17 +155,16 @@ A state can have a resolver that finds the rate from the full address. When it
 finds one, that rate is used; otherwise the engine falls back to the ZIP table.
 
 ```python
-from taxengine import Address, TaxEngine, WashingtonResolver
+from taxengine import Address, TaxEngine, address_resolvers
 
-wa = WashingtonResolver.from_files(use_web_lookup=True)
-engine = TaxEngine(collect_in={"WA"}, resolvers={"WA": wa})
+engine = TaxEngine(collect_in={"WA"}, resolvers=address_resolvers(use_web_lookup=True))
 home = Address("450 110th Ave NE", "Bellevue", "WA", "98004")
 engine.calculate("98004", "100", "WA", address=home).total_tax   # 10.30, Bellevue; the ZIP alone gives Seattle's 10.55
 ```
 
 Washington's resolver uses the Department of Revenue (DOR) in this order:
 
-1. the quarterly ZIP+4 file, when the ZIP has 9 digits and the file is in `data/wa-dor/`;
+1. the quarterly ZIP+4 file, when the ZIP has 9 digits and the file is in `taxengine/states/washington/dor-files/`;
 2. DOR's [address lookup service](https://dor.wa.gov/wa-sales-tax-rate-lookup-url-interface), when there is a street (needs the network);
 3. the ZIP table.
 
@@ -194,12 +193,20 @@ The engine needs no extra libraries (Python 3.10+); the Stripe parts need
     api/vercel_handler.py     runs the webhook on Vercel; pyproject.toml points Vercel to it
 
     taxengine/                the engine (no platform code)
-      tax_calculator.py         rate lookup by ZIP and the tax calculation
-      cart_tax.py               tax for a whole cart: lines, discounts, shipping
-      product_taxability.py     which product categories are taxed in each state
-      washington_address_rates.py  Washington rates by street address, from DOR
+      shared/                   what every state uses
+        tax_calculator.py         rate lookup by ZIP and the tax calculation
+        cart_tax.py               tax for a whole cart: lines, discounts, shipping
+        product_taxability.py     reads each state's product rules
+      states/                   one folder per state; __init__.py lists them
+        washington/               WA only (see its README.md)
+          address_rates.py          rates by street address, from the Department of Revenue
+          taxability.csv            which product categories are taxed in WA
+          dor-files/                DOR's quarterly rates file
     adapters/                 connections to other systems
       stripe_invoice_tax.py     puts the engine's tax on Stripe invoices
       stripe_monthly_report.py  totals the taxed Stripe invoices for a month
-    data/                     rate tables, product rules, Washington DOR files (see data/README.md)
-    tests/                    tests, with small sample files in tests/fixtures/
+    data/                     ZIP-code rate tables for all states (see data/README.md)
+    tests/                    shared tests; tests/washington/ for WA; samples in fixtures/
+
+To add a state: copy the shape of `taxengine/states/washington/` (at least a
+`taxability.csv`), and add it to `STATES` in `taxengine/states/__init__.py`.

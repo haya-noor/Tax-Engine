@@ -1,6 +1,6 @@
 """Check Washington results against official Department of Revenue figures.
 
-Sources are listed in tests/fixtures/validation/README.md.
+Sources are listed in tests/washington/fixtures/validation/README.md.
 """
 
 import csv

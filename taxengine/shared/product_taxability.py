@@ -1,14 +1,13 @@
 """Which product categories are taxed in each state.
 
-Rules live in data/taxability/<STATE>.csv, one row per category, each with
-the official source it came from. See data/taxability/README.md.
+Each state keeps its rules in its own folder, taxengine/states/<state>/taxability.csv,
+one row per category, each with the official source it came from. This module
+only reads them; it knows nothing about any one state.
 """
 
 import csv
 from dataclasses import dataclass
 from pathlib import Path
-
-DEFAULT_TAXABILITY_DIR = Path(__file__).resolve().parent.parent / "data" / "taxability"
 
 GENERAL = "general"
 SHIPPING = "shipping"
@@ -33,19 +32,20 @@ DEFAULT_RULES = {
 }
 
 
-def load_taxability(directory=DEFAULT_TAXABILITY_DIR):
-    """Read every <STATE>.csv into {state: {category: Rule}}."""
+def load_taxability(files):
+    """Read {state: path to its taxability.csv} into {state: {category: Rule}}."""
     rules = {}
-    for path in sorted(Path(directory).glob("*.csv")):
+    for state, path in sorted(files.items()):
+        path = Path(path)
         with open(path, newline="", encoding="utf-8") as f:
             state_rules = {}
             for rec in csv.DictReader(f):
                 taxable = rec["taxable"].strip().lower()
                 if taxable not in ("yes", "no", "proportional"):
-                    raise ValueError(f"{path.name}: taxable must be yes, no or proportional, not {taxable!r}")
+                    raise ValueError(f"{path}: taxable must be yes, no or proportional, not {taxable!r}")
                 rule = Rule(rec["category"].strip(), taxable, rec["description"], rec["source"])
                 state_rules[rule.category] = rule
-        rules[path.stem.upper()] = state_rules
+        rules[state.upper()] = state_rules
     return rules
 
 
