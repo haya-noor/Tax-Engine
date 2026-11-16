@@ -101,7 +101,6 @@ def line_category(client, line):
 
     In order: "tax_category" metadata on the line, on the invoice item it came from,
     or on its product; else the product's Stripe tax code (txcd_...); else "general".
-    Older names such as "groceries" are accepted and turned into the SST name.
     """
     metadata = line.get("metadata") or {}
     if CATEGORY_KEY not in metadata:
@@ -123,7 +122,7 @@ def add_tax_to_invoice(client, engine, invoice_id, memo=None):
 
     client is a stripe.StripeClient; engine is a taxengine.TaxEngine. Each line's
     product category comes from line_category(); lines in the "delivery_charges"
-    category (or the older name "shipping") are delivery charges.
+    category are delivery charges.
     """
     invoice = plain(client.v1.invoices.retrieve(invoice_id))
     if invoice["status"] != "draft":

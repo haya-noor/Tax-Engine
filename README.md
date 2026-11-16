@@ -82,13 +82,13 @@ category are `general`. Washington's file covers:
 | `food_and_food_ingredients`, `candy` | 40030, 40010 | no |
 | `prepared_food`, `soft_drinks`, `bottled_water` | 41000, 40050, 40060 | yes |
 | `dietary_supplements`, `over_the_counter_drugs` | 40020, 51130 | yes |
-| `prescription_drugs`, `newspapers`, `nontaxable` | 51020, –, – | no |
+| `prescription_drugs` | 51020 | no |
 | `digital_products`, `digital_audio_visual_works`, `digital_audio_works`, `digital_books` | 31000, 31040, 31070, 31100 | yes |
-| `prewritten_software`, `prewritten_software_electronic`, `remote_access_software` (SaaS) | 30040, 30050, – | yes |
+| `prewritten_software`, `prewritten_software_electronic` | 30040, 30050 | yes |
 | `delivery_charges` | 11010 | in proportion to taxed goods |
 
-The older names still work: `groceries`, `shipping`, `otc_drugs`, `digital_goods`,
-`software` and `saas` are read as their SST names.
+Only official SST definitions are used, plus `general` for products no SST
+definition covers (it is taxed). Any other name, e.g. `groceries`, is refused.
 
 An unknown category is an error, never a guess. States without a file tax
 `general` products and delivery charges only. See `taxengine/states/washington/README.md`. These
@@ -110,7 +110,7 @@ each line's amount after discounts. Each line's product category comes from
 `tax_category=food_and_food_ingredients`. If there is none, the product's Stripe
 tax code is used (`txcd_30011000` Clothing becomes `clothing`; the list is in
 `adapters/stripe_tax_codes.py`), and anything else is `general`. Lines with
-`tax_category=delivery_charges` (or `shipping`) are delivery charges.
+`tax_category=delivery_charges` are delivery charges.
 
 `stripe_tax_webhook.py` does this automatically, the way a tax app does. Stripe tells
 it whenever a draft invoice is created (for example a subscription renewal) or

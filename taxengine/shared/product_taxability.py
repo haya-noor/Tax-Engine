@@ -6,8 +6,8 @@ only reads them; it knows nothing about any one state.
 
 Category names follow the Streamlined Sales Tax (SST) Library of Definitions,
 so a category means the same thing in every state; the sst_ref column holds
-the SST reference number. Older names (groceries, shipping, ...) still work
-through ALIASES.
+the SST reference number. The only other category is "general", the default
+for products that no SST definition covers.
 """
 
 import csv
@@ -15,25 +15,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 GENERAL = "general"
-NONTAXABLE = "nontaxable"
 SHIPPING = "delivery_charges"
 
-# Names used before the switch to SST definitions, so existing product metadata keeps working.
-ALIASES = {
-    "groceries": "food_and_food_ingredients",
-    "food": "food_and_food_ingredients",
-    "shipping": SHIPPING,
-    "otc_drugs": "over_the_counter_drugs",
-    "digital_goods": "digital_products",
-    "software": "prewritten_software",
-    "saas": "remote_access_software",
-}
-
-
 def canonical_category(category):
-    """'Groceries ' -> 'food_and_food_ingredients'; empty -> 'general'."""
-    category = (category or GENERAL).strip().lower()
-    return ALIASES.get(category, category)
+    """' Candy ' -> 'candy'; empty -> 'general'."""
+    return (category or GENERAL).strip().lower()
 
 
 class UnknownCategoryError(LookupError):
@@ -52,7 +38,6 @@ class Rule:
 # States without a file: general goods and delivery charges are taxed in full.
 DEFAULT_RULES = {
     GENERAL: Rule(GENERAL, "yes", "Physical goods", ""),
-    NONTAXABLE: Rule(NONTAXABLE, "no", "Marked as not subject to sales tax", ""),
     SHIPPING: Rule(SHIPPING, "yes", "Delivery charges", "", "11010"),
 }
 

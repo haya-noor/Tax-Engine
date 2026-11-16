@@ -125,11 +125,11 @@ class StripeCategoriesTest(unittest.TestCase):
 
     def test_categories_and_shipping_from_metadata(self):
         lines = [{"id": "il_shirt", "amount": 4500, "metadata": {"tax_category": "clothing"}},
-                 {"id": "il_bread", "amount": 500, "metadata": {"tax_category": "groceries"}},
-                 {"id": "il_ship", "amount": 800, "metadata": {"tax_category": "shipping"}}]
+                 {"id": "il_bread", "amount": 500, "metadata": {"tax_category": "food_and_food_ingredients"}},
+                 {"id": "il_ship", "amount": 800, "metadata": {"tax_category": "delivery_charges"}}]
         fake = FakeStripe(self.seattle_invoice(), lines)
         total = add_tax_to_invoice(fake, self.engine, "in_1")
-        self.assertNotIn("il_bread", fake.updates)                                  # groceries exempt
+        self.assertNotIn("il_bread", fake.updates)                                  # food exempt
         self.assertEqual(sum(a["amount"] for a in fake.updates["il_shirt"]), 475)    # 45.00 x 10.55%
         self.assertEqual(sum(a["amount"] for a in fake.updates["il_ship"]), 76)      # 90% of 8.00 x 10.55%
         self.assertEqual(fake.updates["il_ship"][0]["taxable_amount"], 720)
@@ -139,7 +139,7 @@ class StripeCategoriesTest(unittest.TestCase):
         lines = [{"id": "il_1", "amount": 500, "metadata": {},
                   "parent": {"invoice_item_details": {"invoice_item": "ii_1"}}}]
         fake = FakeStripe(self.seattle_invoice(), lines)
-        fake.invoice_item_metadata["ii_1"] = {"tax_category": "groceries"}
+        fake.invoice_item_metadata["ii_1"] = {"tax_category": "food_and_food_ingredients"}
         self.assertEqual(add_tax_to_invoice(fake, self.engine, "in_1"), 0)
 
     def product_line(self, product_id, amount=1000):
@@ -225,7 +225,7 @@ class WebhookEventTest(unittest.TestCase):
         self.assertEqual(fake.updates, {})
 
     def test_tax_no_longer_due_is_removed(self):
-        line = {"id": "il_1", "amount": 500, "metadata": {"tax_category": "groceries"},
+        line = {"id": "il_1", "amount": 500, "metadata": {"tax_category": "food_and_food_ingredients"},
                 "taxes": [{"amount": 53, "taxable_amount": 500}]}
         fake = FakeStripe(chicago_invoice(customer_address={"postal_code": "98101", "state": "WA", "country": "US"}),
                           [line])
@@ -238,7 +238,7 @@ class InvoiceRecordTest(unittest.TestCase):
 
     def test_record_is_written_once(self):
         lines = [{"id": "il_shirt", "amount": 4500, "metadata": {"tax_category": "clothing"}},
-                 {"id": "il_bread", "amount": 500, "metadata": {"tax_category": "groceries"}}]
+                 {"id": "il_bread", "amount": 500, "metadata": {"tax_category": "food_and_food_ingredients"}}]
         fake = FakeStripe(chicago_invoice(customer_address={"postal_code": "98101", "state": "WA", "country": "US"}),
                           lines)
         engine = TaxEngine(FIXTURES)
