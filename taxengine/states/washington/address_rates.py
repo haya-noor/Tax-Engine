@@ -25,10 +25,10 @@ from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 
-from .tax_calculator import Address, RateRow, normalize_zip  # noqa: F401  (Address re-exported)
+from ...shared.tax_calculator import Address, RateRow, normalize_zip  # noqa: F401  (Address re-exported)
 
 # Drop DOR's quarterly files here, unzipped (.csv or .txt, any names).
-DEFAULT_DOR_DIR = Path(__file__).resolve().parent.parent / "data" / "wa-dor"
+DEFAULT_DOR_DIR = Path(__file__).resolve().parent / "dor-files"
 
 log = logging.getLogger(__name__)
 

@@ -2,8 +2,7 @@ import unittest
 from decimal import Decimal
 from pathlib import Path
 
-from taxengine import CartLine, TaxEngine, UnknownCategoryError, calculate_cart, load_taxability
-from taxengine.product_taxability import DEFAULT_TAXABILITY_DIR
+from taxengine import CartLine, TaxEngine, UnknownCategoryError, calculate_cart, load_taxability, taxability_files
 
 FIXTURES = Path(__file__).parent / "fixtures" / "rates"
 D = Decimal
@@ -66,7 +65,7 @@ class StatesWithoutRulesTest(unittest.TestCase):
 
 class WashingtonRuleFileTest(unittest.TestCase):
     def test_every_rule_is_valid_and_cites_a_source(self):
-        rules = load_taxability(DEFAULT_TAXABILITY_DIR)["WA"]
+        rules = load_taxability(taxability_files())["WA"]
         self.assertIn("general", rules)
         self.assertEqual(rules["shipping"].taxable, "proportional")
         self.assertEqual(rules["groceries"].taxable, "no")

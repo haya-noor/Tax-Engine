@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 
-from .product_taxability import DEFAULT_TAXABILITY_DIR, load_taxability
+from .product_taxability import load_taxability
 
 CENT = Decimal("0.01")
 
@@ -22,7 +22,7 @@ CENT = Decimal("0.01")
 DEFAULT_RATES_DIR = Path(
     os.environ.get(
         "TAXENGINE_RATES_DIR",
-        Path(__file__).resolve().parent.parent / "data" / "avalara-2026-10",
+        Path(__file__).resolve().parents[2] / "data" / "avalara-2026-10",
     )
 )
 
@@ -161,19 +161,23 @@ class TaxEngine:
 
     collect_in: the states the seller is registered in, e.g. {"WA"}. Addresses in
     any other state get 0 tax. None means every state in the rate tables.
-    taxability_dir: the per-state product category rules (see product_taxability.py).
+    taxability_files: {state: rules CSV}; default = each state folder's
+    taxability.csv (see taxengine/states/ and product_taxability.py).
     resolvers: optional {state: resolver} for rates by street address. A resolver
     has resolve(Address) -> RateRow or None; None falls back to the ZIP5 tables.
-    See washington_address_rates.WashingtonResolver.
+    taxengine.states.address_resolvers() gives one per state that has one.
     """
 
-    def __init__(self, rates_dir=DEFAULT_RATES_DIR, collect_in=None, taxability_dir=DEFAULT_TAXABILITY_DIR,
+    def __init__(self, rates_dir=DEFAULT_RATES_DIR, collect_in=None, taxability_files=None,
                  resolvers=None):
         self.resolvers = {k.upper(): v for k, v in (resolvers or {}).items()}
         self.collect_in = {s.upper() for s in collect_in} if collect_in else None
         self.rates = load_rates(rates_dir, self.collect_in)
         self.rate_version = Path(rates_dir).name
-        self.taxability = load_taxability(taxability_dir)
+        if taxability_files is None:
+            from ..states import taxability_files as state_files   # states build on shared, not the other way
+            taxability_files = state_files()
+        self.taxability = load_taxability(taxability_files)
 
     def collects_in(self, state):
         return self.collect_in is None or state.upper() in self.collect_in

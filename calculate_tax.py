@@ -11,7 +11,7 @@ import argparse
 import logging
 import sys
 
-from taxengine import DEFAULT_RATES_DIR, Address, CartLine, TaxEngine, WashingtonResolver, calculate_cart
+from taxengine import DEFAULT_RATES_DIR, Address, CartLine, TaxEngine, address_resolvers, calculate_cart
 
 
 def main():
@@ -20,7 +20,7 @@ def main():
     parser.add_argument("amount")
     parser.add_argument("--state", help="the address's state; needed for ZIPs that cross a state line")
     parser.add_argument("--category", help="product category, e.g. clothing or groceries (needs --state); "
-                                           "see data/taxability/")
+                                           "see taxengine/states/<state>/taxability.csv")
     parser.add_argument("--street", help="street address (needs --state); in WA the rate then comes from "
                                          "the Department of Revenue by address instead of the ZIP alone")
     parser.add_argument("--city", default="", help="city, used with --street")
@@ -31,8 +31,8 @@ def main():
 
     collect_in = args.collect_in.split(",") if args.collect_in else None
     try:
-        wa = WashingtonResolver.from_files(use_web_lookup=bool(args.street))
-        engine = TaxEngine(args.rates_dir, collect_in=collect_in, resolvers={"WA": wa})
+        resolvers = address_resolvers(use_web_lookup=bool(args.street))
+        engine = TaxEngine(args.rates_dir, collect_in=collect_in, resolvers=resolvers)
     except FileNotFoundError as e:
         sys.exit(f"{e}\nUnzip the rate tables into that folder, or pass --rates-dir.")
     address = None

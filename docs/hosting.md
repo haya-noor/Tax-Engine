@@ -47,7 +47,7 @@ its response.
 - The webhook only accepts test keys (`sk_test_...`) for now, on purpose. Going live
   needs the checks in the README first.
 - Washington rates come from DOR's address lookup service, and location names from
-  `data/wa-dor/Rates_26Q4.csv`. Replace that file each quarter (the next one is due
+  `taxengine/states/washington/dor-files/Rates_26Q4.csv`. Replace that file each quarter (the next one is due
   for January 1).
 - For the monthly report, run `python monthly_tax_report.py 2026-11` on your computer. It
   reads the invoices from Stripe and needs nothing from the server.

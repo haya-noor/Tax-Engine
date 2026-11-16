@@ -1,6 +1,10 @@
-"""A US sales tax engine: address in, tax out."""
+"""A US sales tax engine: address in, tax out.
 
-from .tax_calculator import (
+    shared/   what every state uses (rates by ZIP, the calculation, carts)
+    states/   one folder per state (its product rules, its own rate source)
+"""
+
+from .shared.tax_calculator import (
     DEFAULT_RATES_DIR,
     Address,
     AmbiguousZipError,
@@ -11,24 +15,27 @@ from .tax_calculator import (
     money,
     normalize_zip,
 )
-from .cart_tax import CartLine, CartResult, calculate_cart
-from .product_taxability import UnknownCategoryError, load_taxability
-from .washington_address_rates import WashingtonResolver
+from .shared.cart_tax import CartLine, CartResult, calculate_cart
+from .shared.product_taxability import UnknownCategoryError, load_taxability
+from .states import address_resolvers, taxability_files
+from .states.washington import WashingtonResolver
 
 __all__ = [
     "Address",
-    "WashingtonResolver",
+    "AmbiguousZipError",
     "CartLine",
     "CartResult",
-    "UnknownCategoryError",
-    "calculate_cart",
-    "load_taxability",
     "DEFAULT_RATES_DIR",
-    "AmbiguousZipError",
     "TaxEngine",
     "TaxResult",
+    "UnknownCategoryError",
     "UnknownZipError",
+    "WashingtonResolver",
+    "address_resolvers",
+    "calculate_cart",
     "load_rates",
+    "load_taxability",
     "money",
     "normalize_zip",
+    "taxability_files",
 ]
