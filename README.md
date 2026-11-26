@@ -80,6 +80,13 @@ The full list, how a product's category is found (metadata, then the Stripe
 tax code) and how to add a state are in
 [docs/product-categories.md](docs/product-categories.md).
 
+## Many businesses (Stripe Marketplace)
+
+When businesses install the app, each one's events reach the same webhook with
+their Stripe account id. `backend/` keeps the list of installed accounts and
+their settings in Supabase, and taxes each business's invoices for that account.
+Setup is in [docs/supabase.md](docs/supabase.md).
+
 ## Adapters
 
 Adapters live in `adapters/` and only translate; the tax logic stays in
@@ -203,6 +210,12 @@ The engine needs no extra libraries (Python 3.10+); the Stripe parts need
     adapters/                 connections to other systems
       stripe_invoice_tax.py     puts the engine's tax on Stripe invoices
       stripe_monthly_report.py  totals the taxed Stripe invoices for a month
+      stripe_tax_codes.py       Stripe product tax codes -> categories
+    backend/                  businesses that installed the app (see docs/supabase.md)
+      account_store.py          the accounts table, in Supabase (or in memory for tests)
+      event_router.py           sends each Stripe event to the right business
+    supabase/migrations/      the database tables, as SQL to run in Supabase
+    docs/                     hosting, Supabase setup, product categories
     data/                     ZIP-code rate tables for all states (see data/README.md)
     tests/                    shared tests; tests/washington/ for WA; samples in fixtures/
 

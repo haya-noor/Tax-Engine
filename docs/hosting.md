@@ -16,6 +16,8 @@ there is no server to keep awake. Any host that runs Python also works
    - `STRIPE_SECRET_KEY`: your `sk_test_...` key
    - `STRIPE_WEBHOOK_SECRET`: `whsec_later` for now; you get the real one in step 2
    - `TAXENGINE_COLLECT_IN`: `WA`
+   - Optional, for businesses that install the app: `SUPABASE_URL`,
+     `SUPABASE_SERVICE_ROLE_KEY` and `STRIPE_CONNECT_WEBHOOK_SECRET` (see `docs/supabase.md`)
 4. Click **Deploy**. Vercel shows the address, for example `https://tax-engine-abc.vercel.app`.
    Open it in a browser: it should say `tax engine webhook: ok`. If it says
    `not configured`, a variable is missing or misspelled.
