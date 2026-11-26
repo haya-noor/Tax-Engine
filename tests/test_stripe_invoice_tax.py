@@ -4,7 +4,8 @@ import unittest
 from decimal import Decimal
 from pathlib import Path
 
-from adapters.stripe_invoice_tax import NoTaxAddressError, add_tax_to_invoice, handle_event, tax_amounts_for
+from adapters.stripe_invoice_tax import (NoTaxAddressError, add_tax_to_invoice, handle_event, line_category,
+                                        tax_amounts_for)
 from taxengine import TaxEngine
 
 FIXTURES = Path(__file__).parent / "fixtures" / "rates"
@@ -33,12 +34,16 @@ class FakeStripe:
     def __init__(self, invoice, lines):
         self.invoice, self.lines, self.updates, self.records = invoice, lines, {}, []
         self.invoice_item_metadata = {}
+        self.product_data = {}
         self.v1 = self
         self.invoices = self
         self.line_items = self
         self.invoice_items = self
+        self.products = self
 
     def retrieve(self, object_id):
+        if object_id.startswith("prod_"):
+            return StripeLike({"id": object_id, "metadata": {}, "tax_code": None, **self.product_data.get(object_id, {})})
         if object_id.startswith("ii_"):
             return StripeLike({"id": object_id, "metadata": self.invoice_item_metadata.get(object_id, {})})
         return StripeLike(self.invoice)
@@ -120,11 +125,11 @@ class StripeCategoriesTest(unittest.TestCase):
 
     def test_categories_and_shipping_from_metadata(self):
         lines = [{"id": "il_shirt", "amount": 4500, "metadata": {"tax_category": "clothing"}},
-                 {"id": "il_bread", "amount": 500, "metadata": {"tax_category": "groceries"}},
-                 {"id": "il_ship", "amount": 800, "metadata": {"tax_category": "shipping"}}]
+                 {"id": "il_bread", "amount": 500, "metadata": {"tax_category": "food_and_food_ingredients"}},
+                 {"id": "il_ship", "amount": 800, "metadata": {"tax_category": "delivery_charges"}}]
         fake = FakeStripe(self.seattle_invoice(), lines)
         total = add_tax_to_invoice(fake, self.engine, "in_1")
-        self.assertNotIn("il_bread", fake.updates)                                  # groceries exempt
+        self.assertNotIn("il_bread", fake.updates)                                  # food exempt
         self.assertEqual(sum(a["amount"] for a in fake.updates["il_shirt"]), 475)    # 45.00 x 10.55%
         self.assertEqual(sum(a["amount"] for a in fake.updates["il_ship"]), 76)      # 90% of 8.00 x 10.55%
         self.assertEqual(fake.updates["il_ship"][0]["taxable_amount"], 720)
@@ -134,8 +139,41 @@ class StripeCategoriesTest(unittest.TestCase):
         lines = [{"id": "il_1", "amount": 500, "metadata": {},
                   "parent": {"invoice_item_details": {"invoice_item": "ii_1"}}}]
         fake = FakeStripe(self.seattle_invoice(), lines)
-        fake.invoice_item_metadata["ii_1"] = {"tax_category": "groceries"}
+        fake.invoice_item_metadata["ii_1"] = {"tax_category": "food_and_food_ingredients"}
         self.assertEqual(add_tax_to_invoice(fake, self.engine, "in_1"), 0)
+
+    def product_line(self, product_id, amount=1000):
+        return {"id": "il_1", "amount": amount, "metadata": {},
+                "pricing": {"price_details": {"product": product_id}}}
+
+    def test_category_from_the_product_tax_code(self):
+        fake = FakeStripe(self.seattle_invoice(), [self.product_line("prod_rx")])
+        fake.product_data["prod_rx"] = {"tax_code": "txcd_32020001"}         # Prescription Drugs
+        self.assertEqual(add_tax_to_invoice(fake, self.engine, "in_1"), 0)
+        self.assertEqual(line_category(fake, self.product_line("prod_rx")), "prescription_drugs")
+
+    def test_product_metadata_wins_over_its_tax_code(self):
+        fake = FakeStripe(self.seattle_invoice(), [])
+        fake.product_data["prod_1"] = {"tax_code": "txcd_99999999", "metadata": {"tax_category": "candy"}}
+        self.assertEqual(line_category(fake, self.product_line("prod_1")), "candy")
+
+    def test_unlisted_tax_code_is_taxed_as_general(self):
+        fake = FakeStripe(self.seattle_invoice(), [self.product_line("prod_x")])
+        fake.product_data["prod_x"] = {"tax_code": "txcd_12345678"}
+        self.assertEqual(add_tax_to_invoice(fake, self.engine, "in_1"), 106)   # 10.00 x 10.55%
+
+    def test_codes_sst_does_not_define(self):
+        fake = FakeStripe(self.seattle_invoice(), [])
+        for code, category in [("txcd_00000000", "nontaxable"), ("txcd_10103001", "software_as_a_service"),
+                               ("txcd_10304100", "digital_newspapers")]:
+            fake.product_data["prod_1"] = {"tax_code": code}
+            self.assertEqual(line_category(fake, self.product_line("prod_1")), category)
+
+    def test_older_price_shape_and_expanded_tax_code(self):
+        fake = FakeStripe(self.seattle_invoice(), [])
+        fake.product_data["prod_1"] = {"tax_code": {"id": "txcd_30011000"}}
+        line = {"id": "il_1", "amount": 100, "metadata": {}, "price": {"product": "prod_1"}}
+        self.assertEqual(line_category(fake, line), "clothing")
 
 
 class WebhookEventTest(unittest.TestCase):
@@ -194,7 +232,7 @@ class WebhookEventTest(unittest.TestCase):
         self.assertEqual(fake.updates, {})
 
     def test_tax_no_longer_due_is_removed(self):
-        line = {"id": "il_1", "amount": 500, "metadata": {"tax_category": "groceries"},
+        line = {"id": "il_1", "amount": 500, "metadata": {"tax_category": "food_and_food_ingredients"},
                 "taxes": [{"amount": 53, "taxable_amount": 500}]}
         fake = FakeStripe(chicago_invoice(customer_address={"postal_code": "98101", "state": "WA", "country": "US"}),
                           [line])
@@ -207,7 +245,7 @@ class InvoiceRecordTest(unittest.TestCase):
 
     def test_record_is_written_once(self):
         lines = [{"id": "il_shirt", "amount": 4500, "metadata": {"tax_category": "clothing"}},
-                 {"id": "il_bread", "amount": 500, "metadata": {"tax_category": "groceries"}}]
+                 {"id": "il_bread", "amount": 500, "metadata": {"tax_category": "food_and_food_ingredients"}}]
         fake = FakeStripe(chicago_invoice(customer_address={"postal_code": "98101", "state": "WA", "country": "US"}),
                           lines)
         engine = TaxEngine(FIXTURES)

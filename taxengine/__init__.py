@@ -16,7 +16,7 @@ from .shared.tax_calculator import (
     normalize_zip,
 )
 from .shared.cart_tax import CartLine, CartResult, calculate_cart
-from .shared.product_taxability import UnknownCategoryError, load_taxability
+from .shared.product_taxability import UnknownCategoryError, canonical_category, load_taxability
 from .states import address_resolvers, taxability_files
 from .states.washington import WashingtonResolver
 
@@ -33,6 +33,7 @@ __all__ = [
     "WashingtonResolver",
     "address_resolvers",
     "calculate_cart",
+    "canonical_category",
     "load_rates",
     "load_taxability",
     "money",
