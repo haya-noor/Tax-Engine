@@ -80,8 +80,12 @@ def make_handler(router, webhook_secrets, app_secret=None):
             path = self.path.split("?")[0]
             payload = self.rfile.read(int(self.headers.get("Content-Length", 0)))
             if path in SETTINGS_PATHS:
-                status, data = handle_settings(path, payload, self.headers.get("Stripe-Signature"),
-                                               router.store, app_secret)
+                try:
+                    status, data = handle_settings(path, payload, self.headers.get("Stripe-Signature"),
+                                                   router.store, app_secret)
+                except Exception as e:  # e.g. the database is unreachable: tell the settings screen
+                    print(f"{path}: failed: {e!r}", flush=True)
+                    status, data = 500, {"error": f"server error ({type(e).__name__}), see the server logs"}
                 return self.reply(status, json.dumps(data), "application/json")
             if path not in WEBHOOK_PATHS:
                 return self.reply(404, "not found")

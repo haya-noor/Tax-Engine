@@ -85,7 +85,11 @@ class SupabaseStore:
     TABLE = "accounts"
 
     def __init__(self, url, service_key, send=None, timeout=10):
-        self.base = url.rstrip("/") + "/rest/v1/" + self.TABLE
+        # SUPABASE_URL is the project URL (https://<ref>.supabase.co). Supabase also shows
+        # the REST endpoint (.../rest/v1); accept that too instead of doubling the path.
+        url = url.strip().rstrip("/")
+        url = url[: -len("/rest/v1")] if url.endswith("/rest/v1") else url
+        self.base = url + "/rest/v1/" + self.TABLE
         self.headers = {"apikey": service_key, "Content-Type": "application/json"}
         if service_key.startswith("eyJ"):
             # Legacy service_role keys are JWTs and also go in Authorization. New
