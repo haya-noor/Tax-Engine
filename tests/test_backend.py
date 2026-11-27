@@ -121,6 +121,10 @@ class SupabaseStoreTest(unittest.TestCase):
         self.reply = []
         self.assertIsNone(self.store.get("acct_2"))
 
+    def test_rest_endpoint_url_is_accepted_too(self):
+        for url in ("https://abc.supabase.co/rest/v1", "https://abc.supabase.co/rest/v1/ "):
+            self.assertEqual(SupabaseStore(url, "k").base, "https://abc.supabase.co/rest/v1/accounts")
+
     def test_legacy_service_role_jwt_also_goes_in_authorization(self):
         store = SupabaseStore("https://abc.supabase.co", "eyJhbGciOi.legacy", send=lambda *a: [])
         self.assertEqual(store.headers["Authorization"], "Bearer eyJhbGciOi.legacy")
