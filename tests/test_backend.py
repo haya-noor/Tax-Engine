@@ -116,9 +116,14 @@ class SupabaseStoreTest(unittest.TestCase):
         method, url, headers, _ = self.sent[0]
         self.assertEqual(method, "GET")
         self.assertEqual(url, "https://abc.supabase.co/rest/v1/accounts?account_id=eq.acct_1&select=%2A")
-        self.assertEqual(headers["Authorization"], "Bearer service-key")
+        self.assertEqual(headers["apikey"], "service-key")
+        self.assertNotIn("Authorization", headers)      # new sb_secret_ keys are not JWTs
         self.reply = []
         self.assertIsNone(self.store.get("acct_2"))
+
+    def test_legacy_service_role_jwt_also_goes_in_authorization(self):
+        store = SupabaseStore("https://abc.supabase.co", "eyJhbGciOi.legacy", send=lambda *a: [])
+        self.assertEqual(store.headers["Authorization"], "Bearer eyJhbGciOi.legacy")
 
     def test_install_is_an_upsert_that_keeps_settings(self):
         self.reply = [{"account_id": "acct_1", "status": "active", "collect_in": ["WA"]}]
