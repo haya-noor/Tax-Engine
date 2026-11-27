@@ -1,0 +1,48 @@
+{
+  "id": "com.taxengine.salestax",
+  "version": "0.1.0",
+  "name": "Tax Engine",
+  "icon": "./icon.png",
+  "distribution_type": "public",
+  "sandbox_install_compatible": true,
+  "stripe_api_access_type": "platform",
+  "permissions": [
+    {
+      "permission": "event_read",
+      "purpose": "Receive invoice events so sales tax is added as soon as a draft invoice is created or changed."
+    },
+    {
+      "permission": "invoice_read",
+      "purpose": "Read draft invoices and their line items to calculate sales tax."
+    },
+    {
+      "permission": "invoice_write",
+      "purpose": "Write the calculated sales tax onto each line of draft invoices."
+    },
+    {
+      "permission": "customer_read",
+      "purpose": "Read the customer's shipping or billing address, which decides the tax rate."
+    },
+    {
+      "permission": "product_read",
+      "purpose": "Read each product's tax code or tax_category to know if it is taxable."
+    }
+  ],
+  "ui_extension": {
+    "views": [
+      {
+        "viewport": "settings",
+        "component": "AppSettings"
+      }
+    ],
+    "content_security_policy": {
+      "connect-src": [
+        "https://tax-engine-titu.vercel.app/settings/"
+      ],
+      "purpose": "Loads and saves the states you collect sales tax in, on the Tax Engine server."
+    }
+  },
+  "post_install_action": {
+    "type": "settings"
+  }
+}

@@ -56,6 +56,8 @@ class EventRouter:
             return f"{account_id}: {kind} ignored: the app is not installed"
         if event.get("livemode") or account.livemode:
             return f"{account_id}: {kind} ignored: live mode is not enabled yet"
+        if not account.collect_in:
+            return f"{account_id}: {kind} ignored: not collecting tax in any state (app settings)"
         note = handle_event(self.client_factory(self.api_key, account_id), self.engine_for(account), event)
         return f"{account_id}: {note}" if note else None
 
@@ -70,4 +72,4 @@ class EventRouter:
         obj = event["data"]["object"]
         install_id = obj.get("id", "") if obj.get("object") in ("apps.install", "app.install") else ""
         account = self.store.installed(account_id, bool(event.get("livemode")), install_id)
-        return f"{account_id}: app installed, collecting in {', '.join(account.collect_in)}"
+        return f"{account_id}: app installed, collecting in {', '.join(account.collect_in) or 'no state'}"

@@ -28,6 +28,7 @@ HOST=0.0.0.0 and PORT set. Then add its https://.../webhook URL in the Stripe
 Dashboard under Developers > Webhooks, with the events in EVENTS (adapters/stripe_invoice_tax.py).
 """
 
+import json
 import logging
 import os
 import sys
@@ -38,6 +39,7 @@ import stripe
 from adapters.stripe_invoice_tax import EVENTS
 from backend.account_store import SupabaseStore
 from backend.event_router import INSTALL_EVENTS, UNINSTALL_EVENTS, EventRouter
+from backend.settings_api import SETTINGS_PATHS, handle_settings
 from taxengine import TaxEngine, address_resolvers
 
 PORT = int(os.environ.get("PORT", "4242"))
@@ -55,7 +57,11 @@ def verify(payload, signature, secrets):
     raise stripe.SignatureVerificationError("no matching signing secret", signature)
 
 
-def make_handler(router, webhook_secrets):
+def make_handler(router, webhook_secrets, app_secret=None):
+    """The HTTP handler: Stripe webhooks on /webhook, the app's settings screen on /settings/*.
+
+    app_secret is the Stripe App's signing secret (absec_...), for the settings screen.
+    """
     if isinstance(webhook_secrets, str):
         webhook_secrets = [webhook_secrets]
 
@@ -64,10 +70,21 @@ def make_handler(router, webhook_secrets):
             # Health check for the hosting service: "is the server up?"
             self.reply(200, "tax engine webhook: ok")
 
+        def do_OPTIONS(self):
+            # CORS preflight from the settings screen in the Stripe Dashboard.
+            self.send_response(204)
+            self.cors_headers()
+            self.end_headers()
+
         def do_POST(self):
-            if self.path.split("?")[0] not in WEBHOOK_PATHS:
-                return self.reply(404, "not found")
+            path = self.path.split("?")[0]
             payload = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            if path in SETTINGS_PATHS:
+                status, data = handle_settings(path, payload, self.headers.get("Stripe-Signature"),
+                                               router.store, app_secret)
+                return self.reply(status, json.dumps(data), "application/json")
+            if path not in WEBHOOK_PATHS:
+                return self.reply(404, "not found")
             try:
                 event = verify(payload, self.headers.get("Stripe-Signature"), webhook_secrets)
             except (ValueError, stripe.SignatureVerificationError):
@@ -81,8 +98,16 @@ def make_handler(router, webhook_secrets):
                 print(note, flush=True)
             self.reply(200, "ok")
 
-        def reply(self, code, text):
+        def cors_headers(self):
+            # Every settings request is authenticated by its Stripe signature, so any origin is fine.
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, Stripe-Signature")
+
+        def reply(self, code, text, content_type="text/plain"):
             self.send_response(code)
+            self.send_header("Content-Type", content_type)
+            self.cors_headers()
             self.end_headers()
             self.wfile.write(text.encode())
 
@@ -90,10 +115,11 @@ def make_handler(router, webhook_secrets):
 
 
 def from_env():
-    """(router, webhook_secrets) from environment variables; ValueError if one is missing.
+    """(router, webhook_secrets, app_secret) from environment variables; ValueError if one is missing.
 
     STRIPE_CONNECT_WEBHOOK_SECRET is the signing secret of the Connect endpoint that
-    receives events from businesses that installed the app. SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are optional: without them only the
+    receives events from businesses that installed the app; STRIPE_APP_SECRET (absec_...)
+    checks requests from the app's settings screen. SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are optional: without them only the
     platform's own account is served, not businesses that installed the app.
     """
     key = os.environ.get("STRIPE_SECRET_KEY", "").strip()
@@ -109,16 +135,17 @@ def from_env():
     supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
     store = SupabaseStore(supabase_url, supabase_key) if supabase_url and supabase_key else None
     secrets = [secret] + [s for s in [os.environ.get("STRIPE_CONNECT_WEBHOOK_SECRET", "").strip()] if s]
-    return EventRouter(key, engine, store, resolvers), secrets
+    app_secret = os.environ.get("STRIPE_APP_SECRET", "").strip() or None
+    return EventRouter(key, engine, store, resolvers), secrets, app_secret
 
 
 def main():
     logging.basicConfig(format="note: %(message)s")
     try:
-        router, secrets = from_env()
+        router, secrets, app_secret = from_env()
     except ValueError as e:
         sys.exit(str(e))
-    server = HTTPServer((HOST, PORT), make_handler(router, secrets))
+    server = HTTPServer((HOST, PORT), make_handler(router, secrets, app_secret))
     events = EVENTS + INSTALL_EVENTS + UNINSTALL_EVENTS
     print(f"Listening on http://{HOST}:{PORT}/webhook for: {', '.join(events)}")
     if router.store is None:
