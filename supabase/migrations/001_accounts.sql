@@ -24,4 +24,8 @@ create trigger accounts_touch before update on public.accounts
     for each row execute function public.touch_updated_at();
 
 -- Only the server (service role key) may read or write; the public anon key gets nothing.
+-- The grant is explicit so it works even when "Grant API access to new tables
+-- automatically" was left off when the project was created.
 alter table public.accounts enable row level security;
+revoke all on public.accounts from anon, authenticated;
+grant select, insert, update on public.accounts to service_role;
