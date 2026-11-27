@@ -212,3 +212,51 @@ class SettingsApiTest(unittest.TestCase):
                              client_factory=lambda key, account=None: account and self.fail("no Stripe call expected"))
         event = {"type": "invoice.created", "account": "acct_1", "data": {"object": {"id": "in_1", "status": "draft"}}}
         self.assertIn("not collecting", router.handle(event))
+
+
+class SettingsHttpTest(unittest.TestCase):
+    """Errors reach the settings screen as JSON with CORS headers, never as a bare "Failed to fetch"."""
+
+    def serve(self, handler_class):
+        import threading
+        from http.server import HTTPServer
+        server = HTTPServer(("127.0.0.1", 0), handler_class)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        return f"http://127.0.0.1:{server.server_address[1]}"
+
+    def post(self, url):
+        import urllib.error
+        import urllib.request
+        req = urllib.request.Request(url, data=b'{"user_id":"u","account_id":"a"}', method="POST",
+                                     headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req) as r:
+                return r.status, r.headers, json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            return e.code, e.headers, json.loads(e.read())
+
+    def test_a_crash_in_the_settings_api_is_reported(self):
+        from unittest import mock
+        from stripe_tax_webhook import make_handler
+        router = EventRouter("sk_test_x", TaxEngine(FIXTURES), MemoryStore(), client_factory=lambda *a, **k: None)
+        base = self.serve(make_handler(router, "whsec_x", "absec_x"))
+        with mock.patch("stripe_tax_webhook.handle_settings", side_effect=ConnectionError("db down")):
+            status, headers, data = self.post(base + "/settings/get")
+        self.assertEqual(status, 500)
+        self.assertEqual(headers["Access-Control-Allow-Origin"], "*")
+        self.assertIn("ConnectionError", data["error"])
+
+    def test_missing_server_settings_are_reported(self):
+        import importlib
+        import os
+        from unittest import mock
+        with mock.patch.dict(os.environ, {"STRIPE_SECRET_KEY": "", "STRIPE_WEBHOOK_SECRET": ""}):
+            import api.vercel_handler as vh
+            vh = importlib.reload(vh)
+        base = self.serve(vh.handler)
+        status, headers, data = self.post(base + "/settings/get")
+        self.assertEqual(status, 500)
+        self.assertEqual(headers["Access-Control-Allow-Origin"], "*")
+        self.assertIn("not configured", data["error"])
