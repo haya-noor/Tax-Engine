@@ -70,16 +70,20 @@ class SupabaseError(RuntimeError):
 class SupabaseStore:
     """Accounts in the Supabase table "accounts", through Supabase's REST API (PostgREST).
 
-    Uses the project's service role key, which bypasses row level security, so it
-    must only ever live in the server's environment variables, never in the app UI.
+    Uses the project's secret key (sb_secret_..., or the legacy service_role JWT),
+    which acts as the service_role and bypasses row level security, so it must only
+    ever live in the server's environment variables, never in the app UI.
     """
 
     TABLE = "accounts"
 
     def __init__(self, url, service_key, send=None, timeout=10):
         self.base = url.rstrip("/") + "/rest/v1/" + self.TABLE
-        self.headers = {"apikey": service_key, "Authorization": f"Bearer {service_key}",
-                        "Content-Type": "application/json"}
+        self.headers = {"apikey": service_key, "Content-Type": "application/json"}
+        if service_key.startswith("eyJ"):
+            # Legacy service_role keys are JWTs and also go in Authorization. New
+            # sb_secret_ keys are not JWTs and must only be sent as apikey.
+            self.headers["Authorization"] = f"Bearer {service_key}"
         self.timeout = timeout
         self.send = send or self._send     # tests pass a fake
 

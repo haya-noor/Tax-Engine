@@ -41,7 +41,8 @@ going live is enabled on purpose.
    **Table Editor** and check that the `accounts` table is there.
 3. Open **Project Settings > API** (or **Data API**) and copy:
    - the **Project URL**, `https://xxxx.supabase.co`
-   - the **service_role** secret key, which may also be called the secret key
+   - the **secret key** (`sb_secret_...`, under **Secret keys**). Older projects
+     call it the **service_role** key; either works.
 
    Keep the service role key secret. It can read and write everything, so it
    only ever goes into Vercel's environment variables, never into the app's UI
