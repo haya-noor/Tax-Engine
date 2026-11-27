@@ -159,3 +159,56 @@ class SignatureTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SettingsApiTest(unittest.TestCase):
+    """The settings screen's requests, signed the way fetchStripeSignature() signs them."""
+
+    SECRET = "absec_test"
+
+    def setUp(self):
+        self.store = MemoryStore()
+        self.store.installed("acct_1")
+
+    def call(self, path, body, signed_fields=(), secret=SECRET):
+        from backend.settings_api import handle_settings, signed_payload
+        payload = signed_payload(signed_fields, body)
+        t = int(time.time())
+        mac = hmac.new(secret.encode(), f"{t}.{payload}".encode(), hashlib.sha256).hexdigest()
+        return handle_settings(path, json.dumps(body).encode(), f"t={t},v1={mac}", self.store, self.SECRET)
+
+    def test_get_and_save(self):
+        ids = {"user_id": "usr_1", "account_id": "acct_1"}
+        self.assertEqual(self.call("/settings/get", ids), (200, {"collect_in": ["WA"], "supported_states": ["WA"]}))
+        status, data = self.call("/settings/save", {"collect_in": [], **ids}, ("collect_in",))
+        self.assertEqual((status, data["collect_in"]), (200, []))
+        self.assertEqual(self.store.get("acct_1").collect_in, ())
+
+    def test_signed_payload_matches_javascript(self):
+        from backend.settings_api import signed_payload
+        body = {"collect_in": ["WA"], "user_id": "usr_1", "account_id": "acct_1"}
+        # JSON.stringify({collect_in: ['WA'], user_id: 'usr_1', account_id: 'acct_1'})
+        self.assertEqual(signed_payload(("collect_in",), body),
+                         '{"collect_in":["WA"],"user_id":"usr_1","account_id":"acct_1"}')
+
+    def test_bad_signature_or_other_account_is_refused(self):
+        ids = {"user_id": "usr_1", "account_id": "acct_1"}
+        self.assertEqual(self.call("/settings/get", ids, secret="absec_wrong")[0], 401)
+        # Changing the body after signing breaks the signature.
+        from backend.settings_api import handle_settings, signed_payload
+        t = int(time.time())
+        mac = hmac.new(self.SECRET.encode(), f"{t}.{signed_payload((), ids)}".encode(), hashlib.sha256).hexdigest()
+        forged = json.dumps({"user_id": "usr_1", "account_id": "acct_2"}).encode()
+        self.assertEqual(handle_settings("/settings/get", forged, f"t={t},v1={mac}", self.store, self.SECRET)[0], 401)
+        self.assertEqual(self.call("/settings/get", {"user_id": "u", "account_id": "acct_9"})[0], 404)
+
+    def test_only_supported_states_can_be_saved(self):
+        body = {"collect_in": ["CA"], "user_id": "usr_1", "account_id": "acct_1"}
+        self.assertEqual(self.call("/settings/save", body, ("collect_in",))[0], 400)
+
+    def test_account_collecting_nowhere_gets_no_tax(self):
+        self.store.set_collect_in("acct_1", [])
+        router = EventRouter("sk_test_x", TaxEngine(FIXTURES), self.store,
+                             client_factory=lambda key, account=None: account and self.fail("no Stripe call expected"))
+        event = {"type": "invoice.created", "account": "acct_1", "data": {"object": {"id": "in_1", "status": "draft"}}}
+        self.assertIn("not collecting", router.handle(event))

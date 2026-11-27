@@ -38,7 +38,8 @@ class Account:
     @classmethod
     def from_row(cls, row):
         return cls(row["account_id"], row.get("status") or ACTIVE, bool(row.get("livemode")),
-                   row.get("install_id") or "", tuple(row.get("collect_in") or DEFAULT_COLLECT_IN))
+                   row.get("install_id") or "",
+                   DEFAULT_COLLECT_IN if row.get("collect_in") is None else tuple(row["collect_in"]))
 
 
 class MemoryStore:
@@ -60,6 +61,12 @@ class MemoryStore:
         account = self.accounts.get(account_id)
         if account:
             account.status = UNINSTALLED
+        return account
+
+    def set_collect_in(self, account_id, states):
+        account = self.accounts.get(account_id)
+        if account:
+            account.collect_in = tuple(states)
         return account
 
 
@@ -120,5 +127,10 @@ class SupabaseStore:
 
     def uninstalled(self, account_id):
         rows = self._request("PATCH", {"account_id": f"eq.{account_id}"}, {"status": UNINSTALLED},
+                             prefer="return=representation")
+        return Account.from_row(rows[0]) if rows else None
+
+    def set_collect_in(self, account_id, states):
+        rows = self._request("PATCH", {"account_id": f"eq.{account_id}"}, {"collect_in": list(states)},
                              prefer="return=representation")
         return Account.from_row(rows[0]) if rows else None

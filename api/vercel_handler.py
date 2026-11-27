@@ -3,7 +3,8 @@
 pyproject.toml points Vercel at `handler` below. It uses the same request
 handling as stripe_tax_webhook.py. Settings come from the project's environment
 variables: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, TAXENGINE_COLLECT_IN,
-SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (and optionally TAXENGINE_DOR_LOOKUP=0).
+SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, STRIPE_CONNECT_WEBHOOK_SECRET and
+STRIPE_APP_SECRET (and optionally TAXENGINE_DOR_LOOKUP=0).
 """
 
 import logging
@@ -39,4 +40,6 @@ except ValueError as e:
 class handler(BaseHTTPRequestHandler):
     do_GET = _impl.do_GET
     do_POST = _impl.do_POST
+    do_OPTIONS = getattr(_impl, "do_OPTIONS", _impl.do_GET)
     reply = _impl.reply
+    cors_headers = getattr(_impl, "cors_headers", None)

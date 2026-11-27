@@ -85,7 +85,9 @@ tax code) and how to add a state are in
 When businesses install the app, each one's events reach the same webhook with
 their Stripe account id. `backend/` keeps the list of installed accounts and
 their settings in Supabase, and taxes each business's invoices for that account.
-Setup is in [docs/supabase.md](docs/supabase.md).
+Setup is in [docs/supabase.md](docs/supabase.md). The app itself (manifest,
+permissions, settings page) is in `stripe-app/`; how to upload and install it
+is in [docs/stripe-app.md](docs/stripe-app.md).
 
 ## Adapters
 
@@ -214,8 +216,10 @@ The engine needs no extra libraries (Python 3.10+); the Stripe parts need
     backend/                  businesses that installed the app (see docs/supabase.md)
       account_store.py          the accounts table, in Supabase (or in memory for tests)
       event_router.py           sends each Stripe event to the right business
+      settings_api.py           the app's settings page reads and saves here
+    stripe-app/               the Stripe App: manifest, permissions, settings page
     supabase/migrations/      the database tables, as SQL to run in Supabase
-    docs/                     hosting, Supabase setup, product categories
+    docs/                     hosting, Supabase, the Stripe App, product categories
     data/                     ZIP-code rate tables for all states (see data/README.md)
     tests/                    shared tests; tests/washington/ for WA; samples in fixtures/
 
